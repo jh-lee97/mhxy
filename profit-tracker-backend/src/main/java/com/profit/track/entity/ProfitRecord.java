@@ -42,6 +42,10 @@ public class ProfitRecord implements Serializable {
     /** 备注 */
     private String remark;
 
+    /** 逻辑删除：0-未删除，1-已删除 */
+    @TableLogic
+    private Integer deleted;
+
     /** 创建时间 */
     @TableField(fill = FieldFill.INSERT)
     private String createdAt;

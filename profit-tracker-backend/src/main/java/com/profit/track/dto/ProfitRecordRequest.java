@@ -1,5 +1,6 @@
 package com.profit.track.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -8,37 +9,38 @@ import java.math.BigDecimal;
  * 收益记录新增/编辑请求 DTO
  */
 @Data
+@Schema(description = "收益记录新增/编辑请求")
 public class ProfitRecordRequest implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /** 记录ID（编辑时必填） */
+    @Schema(description = "记录ID（编辑时必填）")
     private Long id;
 
-    /** 用户ID */
+    @Schema(description = "用户ID")
     private Long userId;
 
-    /** 日期 */
+    @Schema(description = "日期，格式 yyyy-MM-dd")
     private String date;
 
-    /** 玩法模式 */
+    @Schema(description = "玩法模式：副本/捉鬼/刷宝图/日常任务/活动/跑商/其他")
     private String mode;
 
-    /** 活动名称 */
+    @Schema(description = "活动名称")
     private String activity;
 
-    /** 常规收入(梦幻币) */
+    @Schema(description = "常规收入(梦幻币，单位：万)")
     private BigDecimal income;
 
-    /** 藏宝阁变现 */
+    @Schema(description = "藏宝阁变现(单位：万)")
     private BigDecimal cbgIncome;
 
-    /** 道具/装备价值 */
+    @Schema(description = "道具/装备价值(单位：万)")
     private BigDecimal propIncome;
 
-    /** 总成本 */
+    @Schema(description = "总成本(单位：万)")
     private BigDecimal cost;
 
-    /** 备注 */
+    @Schema(description = "备注")
     private String remark;
 }

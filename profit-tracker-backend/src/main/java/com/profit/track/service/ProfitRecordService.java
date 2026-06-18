@@ -11,20 +11,20 @@ import java.util.List;
 public interface ProfitRecordService extends IService<ProfitRecord> {
 
     /** 分页查询记录 */
-    List<ProfitRecordResponse> listRecords(Long userId);
+    List<ProfitRecordResponse> listRecords(Long userId, Integer roleLevel);
 
     /** 新增记录 */
     ProfitRecordResponse addRecord(ProfitRecordRequest request);
 
     /** 更新记录 */
-    ProfitRecordResponse updateRecord(ProfitRecordRequest request);
+    ProfitRecordResponse updateRecord(ProfitRecordRequest request, Long userId, Integer roleLevel);
 
     /** 删除记录 */
-    void deleteRecord(Long id, Long userId);
+    void deleteRecord(Long id, Long userId, Integer roleLevel);
 
     /** 获取统计信息 */
-    StatResponse getStats(Long userId);
+    StatResponse getStats(Long userId, Integer roleLevel);
 
     /** 获取图表数据（近7日） */
-    List<ChartResponse> getChartRecords(Long userId);
+    List<ChartResponse> getChartRecords(Long userId, Integer roleLevel);
 }

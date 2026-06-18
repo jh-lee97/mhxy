@@ -1,5 +1,6 @@
 package com.profit.track.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -8,16 +9,17 @@ import java.math.BigDecimal;
  * 图表数据（近7日趋势）
  */
 @Data
+@Schema(description = "图表数据响应")
 public class ChartResponse implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /** 日期 */
+    @Schema(description = "日期")
     private String date;
-    /** 收入 */
+    @Schema(description = "收入")
     private BigDecimal income;
-    /** 成本 */
+    @Schema(description = "成本")
     private BigDecimal cost;
-    /** 净利润 */
+    @Schema(description = "净利润")
     private BigDecimal profit;
 }

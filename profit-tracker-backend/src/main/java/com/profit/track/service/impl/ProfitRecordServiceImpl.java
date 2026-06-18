@@ -7,7 +7,9 @@ import com.profit.track.dto.ProfitRecordRequest;
 import com.profit.track.dto.ProfitRecordResponse;
 import com.profit.track.dto.StatResponse;
 import com.profit.track.entity.ProfitRecord;
+import com.profit.track.entity.SysUser;
 import com.profit.track.mapper.ProfitRecordMapper;
+import com.profit.track.mapper.SysUserMapper;
 import com.profit.track.service.ProfitRecordService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
@@ -27,14 +29,24 @@ public class ProfitRecordServiceImpl extends ServiceImpl<ProfitRecordMapper, Pro
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter ISO_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final int SUPER_ADMIN_LEVEL = 100;
+
+    private final SysUserMapper sysUserMapper;
 
     @Override
-    public List<ProfitRecordResponse> listRecords(Long userId) {
-        List<ProfitRecord> records = lambdaQuery()
-                .eq(ProfitRecord::getUserId, userId)
-                .orderByDesc(ProfitRecord::getDate)
-                .orderByDesc(ProfitRecord::getCreatedAt)
-                .list();
+    public List<ProfitRecordResponse> listRecords(Long userId, Integer roleLevel) {
+        List<ProfitRecord> records;
+        if (isSuperAdmin(roleLevel)) {
+            // 管理员：查询所有记录
+            records = list();
+        } else {
+            // 普通用户：只查询自己的记录
+            records = lambdaQuery()
+                    .eq(ProfitRecord::getUserId, userId)
+                    .orderByDesc(ProfitRecord::getDate)
+                    .orderByDesc(ProfitRecord::getCreatedAt)
+                    .list();
+        }
         return records.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
@@ -50,10 +62,14 @@ public class ProfitRecordServiceImpl extends ServiceImpl<ProfitRecordMapper, Pro
     }
 
     @Override
-    public ProfitRecordResponse updateRecord(ProfitRecordRequest request) {
+    public ProfitRecordResponse updateRecord(ProfitRecordRequest request, Long userId, Integer roleLevel) {
         ProfitRecord existing = getById(request.getId());
         if (existing == null) {
             throw new RuntimeException("记录不存在");
+        }
+        // 普通用户只能修改自己的记录，管理员可以修改所有记录
+        if (!isSuperAdmin(roleLevel) && !existing.getUserId().equals(userId)) {
+            throw new RuntimeException("无权修改他人的记录");
         }
         BeanUtils.copyProperties(request, existing, "id", "createdAt");
         existing.setUpdatedAt(LocalDateTime.now().format(ISO_FMT));
@@ -62,15 +78,28 @@ public class ProfitRecordServiceImpl extends ServiceImpl<ProfitRecordMapper, Pro
     }
 
     @Override
-    public void deleteRecord(Long id, Long userId) {
+    public void deleteRecord(Long id, Long userId, Integer roleLevel) {
+        ProfitRecord existing = getById(id);
+        if (existing == null) {
+            throw new RuntimeException("记录不存在");
+        }
+        // 普通用户只能删除自己的记录，管理员可以删除所有记录
+        if (!isSuperAdmin(roleLevel) && !existing.getUserId().equals(userId)) {
+            throw new RuntimeException("无权删除他人的记录");
+        }
         removeById(id);
     }
 
     @Override
-    public StatResponse getStats(Long userId) {
-        List<ProfitRecord> allRecords = lambdaQuery()
-                .eq(ProfitRecord::getUserId, userId)
-                .list();
+    public StatResponse getStats(Long userId, Integer roleLevel) {
+        List<ProfitRecord> allRecords;
+        if (isSuperAdmin(roleLevel)) {
+            allRecords = list();
+        } else {
+            allRecords = lambdaQuery()
+                    .eq(ProfitRecord::getUserId, userId)
+                    .list();
+        }
 
         String today = LocalDate.now().format(DATE_FMT);
         LocalDate weekStart = LocalDate.now().with(java.time.DayOfWeek.MONDAY);
@@ -118,10 +147,15 @@ public class ProfitRecordServiceImpl extends ServiceImpl<ProfitRecordMapper, Pro
     }
 
     @Override
-    public List<ChartResponse> getChartRecords(Long userId) {
-        List<ProfitRecord> allRecords = lambdaQuery()
-                .eq(ProfitRecord::getUserId, userId)
-                .list();
+    public List<ChartResponse> getChartRecords(Long userId, Integer roleLevel) {
+        List<ProfitRecord> allRecords;
+        if (isSuperAdmin(roleLevel)) {
+            allRecords = list();
+        } else {
+            allRecords = lambdaQuery()
+                    .eq(ProfitRecord::getUserId, userId)
+                    .list();
+        }
 
         List<ChartResponse> result = new ArrayList<>();
         LocalDate today = LocalDate.now();
@@ -156,5 +190,10 @@ public class ProfitRecordServiceImpl extends ServiceImpl<ProfitRecordMapper, Pro
         ProfitRecordResponse resp = new ProfitRecordResponse();
         BeanUtils.copyProperties(record, resp);
         return resp;
+    }
+
+    /** 判断是否为超级管理员 */
+    private boolean isSuperAdmin(Integer roleLevel) {
+        return roleLevel != null && roleLevel >= SUPER_ADMIN_LEVEL;
     }
 }
