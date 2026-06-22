@@ -16,7 +16,7 @@
     <artifactId>profit-tracker-backend</artifactId>
     <version>1.0.0</version>
     <name>profit-tracker-backend</name>
-    <description>梦幻西游五开收益记录后端服务</description>
+    <description>工作台后端服务</description>
 
     <properties>
         <java.version>1.8</java.version>

@@ -1,11 +1,13 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import Dashboard from '../components/Dashboard.vue'
 import AddRecordForm from '../components/AddRecordForm.vue'
 import RecordList from '../components/RecordList.vue'
 import ProfitChart from '../components/ProfitChart.vue'
-import { useProfitStore } from '../stores/profitStore.js'
+import { useAuthStore } from '../stores/authStore.js'
+import { addRecord as apiAddRecord } from '../api/record.js'
 
 const router = useRouter()
 const store = useProfitStore()
@@ -14,6 +16,10 @@ const formRef = ref(null)
 const isLoggedIn = computed(() => store.token !== null)
 const isAdmin = computed(() => store.isAdmin())
 
+function goToAdmin() {
+  router.push('/admin')
+}
+
 async function handleAdd(record) {
   await store.addRecord(record)
   if (formRef.value && formRef.value.closeDialog) {
@@ -21,9 +27,19 @@ async function handleAdd(record) {
   }
 }
 
-function handleLogout() {
-  store.logout()
-  router.push('/login')
+async function handleLogout() {
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    store.logout()
+    ElMessage.success('已退出登录')
+    router.push('/login')
+  } catch {
+    // 用户取消
+  }
 }
 
 onMounted(() => {
@@ -40,12 +56,13 @@ onMounted(() => {
     <header class="header">
       <div class="header-content">
         <div class="header-left">
-          <h1 class="title">💰 梦幻西游 · 五开收益记录</h1>
+          <h1 class="title">💰 工作台</h1>
           <p class="subtitle">记录每一笔收益，清晰掌握赚钱效率</p>
         </div>
         <div class="header-right" v-if="isLoggedIn">
           <span class="user-info">👤 {{ store.username }}</span>
           <span v-if="isAdmin" class="admin-badge">👑 管理员</span>
+          <button v-if="isAdmin" class="admin-btn" @click="goToAdmin">后台管理</button>
           <button class="logout-btn" @click="handleLogout">退出</button>
         </div>
       </div>
@@ -85,6 +102,8 @@ onMounted(() => {
 .header-right { display: flex; align-items: center; gap: 16px; }
 .user-info { font-size: 14px; opacity: 0.9; }
 .admin-badge { font-size: 13px; color: #ffd700; font-weight: 600; }
+.admin-btn { background: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.5); color: #fff; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.2s; }
+.admin-btn:hover { background: rgba(255,255,255,0.4); }
 .logout-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.2s; }
 .logout-btn:hover { background: rgba(255,255,255,0.3); }
 .main { max-width: 1200px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; }

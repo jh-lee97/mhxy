@@ -7,7 +7,15 @@ const router = useRouter()
 const store = useProfitStore()
 
 // 三种模式：'login' | 'register' | 'reset'
+// login 子模式：'password'（用户名密码）| 'code'（手机号验证码）
 const mode = ref('login')
+// 切换登录类型时清除错误信息
+function switchLoginType(type) {
+  loginType.value = type
+  errorMsg.value = ''
+}
+
+const loginType = ref('password') // 'password' 或 'code'
 const username = ref('')
 const password = ref('')
 const nickname = ref('')
@@ -18,7 +26,6 @@ const loading = ref(false)
 const errorMsg = ref('')
 const sendingCode = ref(false)
 const countdown = ref(0)
-const phoneLocked = ref(false)
 let countdownTimer = null
 
 function toggleMode() {
@@ -39,12 +46,13 @@ function toggleReset() {
 
 function resetForm() {
   errorMsg.value = ''
+  username.value = ''
   password.value = ''
   nickname.value = ''
   confirmPassword.value = ''
   phone.value = ''
-  phoneLocked.value = false
   verificationCode.value = ''
+  loginType.value = 'password'
   loading.value = false
   sendingCode.value = false
   countdown.value = 0
@@ -75,8 +83,25 @@ async function handleSendCode() {
   sendingCode.value = true
   errorMsg.value = ''
   try {
-    await store.sendVerificationCode(username.value, phone.value)
-    phoneLocked.value = true
+    await store.sendResetCode(phone.value)
+    startCountdown()
+    errorMsg.value = '验证码已发送至控制台，请查看'
+  } catch (err) {
+    errorMsg.value = err.message || '发送验证码失败'
+  } finally {
+    sendingCode.value = false
+  }
+}
+
+async function handleLoginSendCode() {
+  if (!phone.value.trim()) {
+    errorMsg.value = '请输入手机号'
+    return
+  }
+  sendingCode.value = true
+  errorMsg.value = ''
+  try {
+    await store.sendLoginCode(phone.value)
     startCountdown()
     errorMsg.value = '验证码已发送至控制台，请查看'
   } catch (err) {
@@ -95,7 +120,6 @@ async function handleRegisterSendCode() {
   errorMsg.value = ''
   try {
     await store.sendRegisterCode(phone.value)
-    phoneLocked.value = true
     startCountdown()
     errorMsg.value = '验证码已发送至控制台，请查看'
   } catch (err) {
@@ -106,9 +130,39 @@ async function handleRegisterSendCode() {
 }
 
 async function handleSubmit() {
-  if (mode.value !== 'reset') {
-    if (!username.value.trim() || !password.value.trim()) {
-      errorMsg.value = '请填写完整信息'
+  // 非重置密码模式下的通用校验
+  if (mode.value === 'login') {
+    // 用户名密码登录才校验用户名和密码
+    if (loginType.value === 'password') {
+      if (!username.value.trim() || !password.value.trim()) {
+        errorMsg.value = '请填写完整信息'
+        return
+      }
+    }
+    // 手机号验证码登录的校验在下方
+  } else if (mode.value === 'register') {
+    if (!nickname.value.trim()) {
+      errorMsg.value = '请输入昵称'
+      loading.value = false
+      return
+    }
+    if (!verificationCode.value.trim()) {
+      errorMsg.value = '请输入验证码'
+      loading.value = false
+      return
+    }
+  } else {
+    // reset 模式
+    if (!phone.value.trim() || !verificationCode.value.trim()) {
+      errorMsg.value = '请输入手机号和验证码'
+      return
+    }
+    if (password.value.length < 6) {
+      errorMsg.value = '新密码至少6位'
+      return
+    }
+    if (password.value !== confirmPassword.value) {
+      errorMsg.value = '两次输入的密码不一致'
       return
     }
   }
@@ -118,15 +172,26 @@ async function handleSubmit() {
 
   try {
     if (mode.value === 'login') {
-      await store.login(username.value, password.value)
+      if (loginType.value === 'password') {
+        // 用户名密码登录
+        await store.login(username.value, password.value)
+      } else {
+        // 手机号验证码登录
+        if (!phone.value.trim() || !verificationCode.value.trim()) {
+          errorMsg.value = '请输入手机号和验证码'
+          loading.value = false
+          return
+        }
+        await store.phoneLogin(phone.value, verificationCode.value)
+      }
     } else if (mode.value === 'register') {
       if (!nickname.value.trim()) {
         errorMsg.value = '请输入昵称'
         loading.value = false
         return
       }
-      if (!phoneLocked.value || !verificationCode.value.trim()) {
-        errorMsg.value = '请先获取并填写验证码'
+      if (!verificationCode.value.trim()) {
+        errorMsg.value = '请输入验证码'
         loading.value = false
         return
       }
@@ -163,9 +228,11 @@ async function handleSubmit() {
       errorMsg.value = err.message || '用户名或密码错误'
     } else if (mode.value === 'register') {
       errorMsg.value = err.message || '注册失败'
+    } else {
+      errorMsg.value = err.message || '重置密码失败'
     }
   } finally {
-    if (mode.value !== 'reset') loading.value = false
+    loading.value = false
   }
 }
 </script>
@@ -174,7 +241,7 @@ async function handleSubmit() {
   <div class="login-page">
     <div class="login-card">
       <div class="login-header">
-        <h2>💰 梦幻西游 · 五开收益记录</h2>
+        <h2>💰 工作台</h2>
         <p class="login-subtitle">
           {{ mode === 'login' ? '欢迎回来' : mode === 'register' ? '创建新账号' : '忘记密码？' }}
         </p>
@@ -183,23 +250,61 @@ async function handleSubmit() {
       <form class="login-form" @submit.prevent="handleSubmit">
         <!-- 登录表单 -->
         <template v-if="mode === 'login'">
-          <div class="form-item">
-            <label>用户名</label>
-            <input v-model="username" type="text" placeholder="请输入用户名" required />
+          <div class="login-tabs">
+            <div
+              class="login-tab"
+              :class="{ active: loginType === 'password' }"
+              @click="switchLoginType('password')"
+            >
+              账号密码登录
+            </div>
+            <div
+              class="login-tab"
+              :class="{ active: loginType === 'code' }"
+              @click="switchLoginType('code')"
+            >
+              手机号登录
+            </div>
           </div>
-          <div class="form-item">
-            <label>密码</label>
-            <input v-model="password" type="password" placeholder="请输入密码" required />
-          </div>
+
+          <template v-if="loginType === 'password'">
+            <div class="form-item">
+              <label>用户名</label>
+              <input v-model="username" type="text" placeholder="请输入用户名" required />
+            </div>
+            <div class="form-item">
+              <label>密码</label>
+              <input v-model="password" type="password" placeholder="请输入密码" required />
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="form-item">
+              <label>手机号</label>
+              <input v-model="phone" type="text" placeholder="请输入手机号" required />
+            </div>
+            <div class="form-row">
+              <div class="form-item code-field">
+                <label>验证码</label>
+                <input v-model="verificationCode" type="text" placeholder="请输入6位验证码" required />
+              </div>
+              <div class="form-item code-btn-wrap">
+                <label>&nbsp;</label>
+                <button class="code-btn" :disabled="sendingCode || countdown > 0" @click.stop="handleLoginSendCode">
+                  {{ countdown > 0 ? countdown + 's' : (sendingCode ? '发送中...' : '获取验证码') }}
+                </button>
+              </div>
+            </div>
+          </template>
         </template>
 
         <!-- 注册表单 -->
         <template v-if="mode === 'register'">
           <div class="form-item">
             <label>手机号</label>
-            <input v-model="phone" type="text" placeholder="请输入手机号" :readonly="phoneLocked" required />
+            <input v-model="phone" type="text" placeholder="请输入手机号" required />
           </div>
-          <div class="form-row" v-if="!phoneLocked">
+          <div class="form-row">
             <div class="form-item code-field">
               <label>验证码</label>
               <input v-model="verificationCode" type="text" placeholder="请输入6位验证码" required />
@@ -210,10 +315,6 @@ async function handleSubmit() {
                 {{ countdown > 0 ? countdown + 's' : (sendingCode ? '发送中...' : '获取验证码') }}
               </button>
             </div>
-          </div>
-          <div class="form-item" v-if="phoneLocked">
-            <label>验证码</label>
-            <input v-model="verificationCode" type="text" placeholder="请输入验证码" required />
           </div>
           <div class="form-item">
             <label>用户名</label>
@@ -233,7 +334,7 @@ async function handleSubmit() {
         <template v-if="mode === 'reset'">
           <div class="form-item">
             <label>手机号</label>
-            <input :value="phone" type="text" placeholder="请输入注册时的手机号" :readonly="phoneLocked" required />
+            <input v-model="phone" type="text" placeholder="请输入注册时的手机号" required />
           </div>
           <div class="form-row">
             <div class="form-item code-field">
@@ -318,6 +419,34 @@ async function handleSubmit() {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.login-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #ebeef5;
+}
+
+.login-tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px 0;
+  font-size: 14px;
+  color: #909399;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+}
+
+.login-tab:hover {
+  color: #409eff;
+}
+
+.login-tab.active {
+  color: #409eff;
+  border-bottom-color: #409eff;
+  font-weight: 500;
 }
 
 .form-row {

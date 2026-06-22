@@ -66,8 +66,8 @@ public class MybatisPlusConfig {
     public OpenAPI openAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("梦幻西游五开收益记录 API")
-                        .description("记录梦幻西游五开游戏收益、成本、利润的 RESTful API")
+                        .title("工作台 API")
+                        .description("收益、成本、利润管理的 RESTful API")
                         .version("1.0.0"));
     }
 }

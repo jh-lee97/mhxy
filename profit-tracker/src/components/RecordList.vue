@@ -1,21 +1,28 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useProfitStore } from '../stores/profitStore.js'
+import { getRecords, deleteRecord as apiDeleteRecord } from '../api/record.js'
+import { formatMoney } from '../utils/format.js'
 
-const store = useProfitStore()
+const loading = ref(false)
 const records = ref([])
 const dialogVisible = ref(false)
 const _targetId = ref(null)
 
 async function loadRecords() {
-  records.value = await store.getRecords()
+  loading.value = true
+  try {
+    const res = await getRecords()
+    records.value = res?.data?.code === 200 ? res.data.data : []
+  } catch (e) {
+    console.error('加载记录失败:', e)
+  } finally {
+    loading.value = false
+  }
 }
 
-async function deleteRecord(id) {
-  if (confirm('确定删除这条记录吗？')) {
-    await store.deleteRecord(id)
-    await loadRecords()
-  }
+async function deleteRecordById(id) {
+  await apiDeleteRecord(id)
+  await loadRecords()
 }
 
 function confirmDelete(id) {
@@ -25,7 +32,7 @@ function confirmDelete(id) {
 
 async function doDelete() {
   if (_targetId.value != null) {
-    await deleteRecord(_targetId.value)
+    await deleteRecordById(_targetId.value)
     dialogVisible.value = false
   }
 }
@@ -77,9 +84,9 @@ function getIncome(record) {
             <td>{{ r.date }}</td>
             <td><span class="tag">{{ r.mode }}</span></td>
             <td>{{ r.activity || '-' }}</td>
-            <td class="income-cell">{{ store.formatMoney(getIncome(r)) }}</td>
-            <td class="cost-cell">{{ store.formatMoney(r.cost) }}</td>
-            <td :class="getNetProfitClass(r)">{{ store.formatMoney(getIncome(r) - r.cost) }}</td>
+            <td class="income-cell">{{ formatMoney(getIncome(r)) }}</td>
+            <td class="cost-cell">{{ formatMoney(r.cost) }}</td>
+            <td :class="getNetProfitClass(r)">{{ formatMoney(getIncome(r) - r.cost) }}</td>
             <td class="actions">
               <button class="btn-sm delete" @click="confirmDelete(r.id)">删除</button>
             </td>

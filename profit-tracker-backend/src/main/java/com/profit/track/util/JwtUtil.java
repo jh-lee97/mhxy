@@ -11,7 +11,9 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtUtil {
@@ -33,6 +35,23 @@ public class JwtUtil {
         claims.put("userId", userId);
         claims.put("username", username);
         claims.put("roleName", roleName);
+
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(username)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    /** 生成 Token（含权限和角色列表） */
+    public String generateToken(Long userId, String username, List<String> permissions, List<String> roles) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("username", username);
+        claims.put("permissions", permissions);
+        claims.put("roles", roles);
 
         return Jwts.builder()
                 .setClaims(claims)
@@ -68,6 +87,37 @@ public class JwtUtil {
     public String getRoleNameFromToken(String token) {
         Claims claims = parseToken(token);
         return claims.get("roleName", String.class);
+    }
+
+    /** 从 Token 中获取权限列表 */
+    public List<String> getPermissionsFromToken(String token) {
+        Claims claims = parseToken(token);
+        Object perms = claims.get("permissions");
+        if (perms instanceof List) {
+            return ((List<?>) perms).stream().map(Object::toString).collect(Collectors.toList());
+        }
+        return new java.util.ArrayList<>();
+    }
+
+    /** 从 Token 中获取角色列表 */
+    public List<String> getRolesFromToken(String token) {
+        Claims claims = parseToken(token);
+        Object roles = claims.get("roles");
+        if (roles instanceof List) {
+            return ((List<?>) roles).stream().map(Object::toString).collect(Collectors.toList());
+        }
+        // 兼容旧 Token：从 roleName 字段回退
+        String roleName = getRoleNameFromToken(token);
+        if (roleName != null && !roleName.isEmpty()) {
+            return java.util.Collections.singletonList(roleName);
+        }
+        return new java.util.ArrayList<>();
+    }
+
+    /** 判断 Token 是否包含权限列表（用于检测旧 Token） */
+    public boolean tokenHasPermissions(String token) {
+        Claims claims = parseToken(token);
+        return claims.get("permissions") != null;
     }
 
     /** 验证 Token 是否过期 */

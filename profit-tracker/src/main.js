@@ -1,6 +1,14 @@
 import { createApp } from 'vue'
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import './styles/global.css'
 import App from './views/App.vue'
 import router from './router'
+import { setupPermissionDirective } from './utils/permission.js'
 
-createApp(App).use(router).mount('#app')
+const app = createApp(App)
+app.use(ElementPlus, { locale: zhCn })
+app.use(router)
+setupPermissionDirective(app)
+app.mount('#app')

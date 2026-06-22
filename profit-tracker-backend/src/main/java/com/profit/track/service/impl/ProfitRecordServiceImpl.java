@@ -7,7 +7,6 @@ import com.profit.track.dto.ProfitRecordRequest;
 import com.profit.track.dto.ProfitRecordResponse;
 import com.profit.track.dto.StatResponse;
 import com.profit.track.entity.ProfitRecord;
-import com.profit.track.entity.SysUser;
 import com.profit.track.mapper.ProfitRecordMapper;
 import com.profit.track.mapper.SysUserMapper;
 import com.profit.track.service.ProfitRecordService;
@@ -21,6 +20,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,18 +29,20 @@ public class ProfitRecordServiceImpl extends ServiceImpl<ProfitRecordMapper, Pro
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter ISO_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final int SUPER_ADMIN_LEVEL = 100;
 
     private final SysUserMapper sysUserMapper;
 
     @Override
-    public List<ProfitRecordResponse> listRecords(Long userId, Integer roleLevel) {
+    public List<ProfitRecordResponse> listRecords(Long userId) {
+        // 权限检查已在 Controller 的 @PreAuthorize 中处理
+        // 管理员查看所有，普通用户只看自己的
+        // 这里通过判断用户角色来决定查询范围
+        boolean isAdmin = isAdmin(userId);
+        
         List<ProfitRecord> records;
-        if (isSuperAdmin(roleLevel)) {
-            // 管理员：查询所有记录
+        if (isAdmin) {
             records = list();
         } else {
-            // 普通用户：只查询自己的记录
             records = lambdaQuery()
                     .eq(ProfitRecord::getUserId, userId)
                     .orderByDesc(ProfitRecord::getDate)
@@ -62,13 +64,13 @@ public class ProfitRecordServiceImpl extends ServiceImpl<ProfitRecordMapper, Pro
     }
 
     @Override
-    public ProfitRecordResponse updateRecord(ProfitRecordRequest request, Long userId, Integer roleLevel) {
+    public ProfitRecordResponse updateRecord(ProfitRecordRequest request, Long userId) {
         ProfitRecord existing = getById(request.getId());
         if (existing == null) {
             throw new RuntimeException("记录不存在");
         }
-        // 普通用户只能修改自己的记录，管理员可以修改所有记录
-        if (!isSuperAdmin(roleLevel) && !existing.getUserId().equals(userId)) {
+        // 检查权限：管理员或记录所有者
+        if (!isAdmin(userId) && !existing.getUserId().equals(userId)) {
             throw new RuntimeException("无权修改他人的记录");
         }
         BeanUtils.copyProperties(request, existing, "id", "createdAt");
@@ -78,22 +80,24 @@ public class ProfitRecordServiceImpl extends ServiceImpl<ProfitRecordMapper, Pro
     }
 
     @Override
-    public void deleteRecord(Long id, Long userId, Integer roleLevel) {
+    public void deleteRecord(Long id, Long userId) {
         ProfitRecord existing = getById(id);
         if (existing == null) {
             throw new RuntimeException("记录不存在");
         }
-        // 普通用户只能删除自己的记录，管理员可以删除所有记录
-        if (!isSuperAdmin(roleLevel) && !existing.getUserId().equals(userId)) {
+        // 检查权限：管理员或记录所有者
+        if (!isAdmin(userId) && !existing.getUserId().equals(userId)) {
             throw new RuntimeException("无权删除他人的记录");
         }
         removeById(id);
     }
 
     @Override
-    public StatResponse getStats(Long userId, Integer roleLevel) {
+    public StatResponse getStats(Long userId) {
+        boolean isAdmin = isAdmin(userId);
         List<ProfitRecord> allRecords;
-        if (isSuperAdmin(roleLevel)) {
+        
+        if (isAdmin) {
             allRecords = list();
         } else {
             allRecords = lambdaQuery()
@@ -147,9 +151,11 @@ public class ProfitRecordServiceImpl extends ServiceImpl<ProfitRecordMapper, Pro
     }
 
     @Override
-    public List<ChartResponse> getChartRecords(Long userId, Integer roleLevel) {
+    public List<ChartResponse> getChartRecords(Long userId) {
+        boolean isAdmin = isAdmin(userId);
         List<ProfitRecord> allRecords;
-        if (isSuperAdmin(roleLevel)) {
+        
+        if (isAdmin) {
             allRecords = list();
         } else {
             allRecords = lambdaQuery()
@@ -192,8 +198,18 @@ public class ProfitRecordServiceImpl extends ServiceImpl<ProfitRecordMapper, Pro
         return resp;
     }
 
-    /** 判断是否为超级管理员 */
-    private boolean isSuperAdmin(Integer roleLevel) {
-        return roleLevel != null && roleLevel >= SUPER_ADMIN_LEVEL;
+    /** 判断用户是否为管理员 */
+    private boolean isAdmin(Long userId) {
+        // 从 SecurityContext 获取权限列表
+        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        
+        Set<String> roles = auth.getAuthorities().stream()
+                .map(a -> a.getAuthority())
+                .filter(a -> a.startsWith("ROLE_"))
+                .collect(Collectors.toSet());
+        
+        return roles.contains("ROLE_ADMIN");
     }
 }

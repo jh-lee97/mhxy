@@ -7,8 +7,10 @@ const DEFAULT_USER_ID = 1
 export function useProfitStore() {
   let token = getToken()
   let username = localStorage.getItem('username') || ''
-  let roleLevel = parseInt(localStorage.getItem('roleLevel') || '1')
   let userId = localStorage.getItem('userId') ? parseInt(localStorage.getItem('userId')) : null
+  let permissions = JSON.parse(localStorage.getItem('permissions') || '[]')
+  let roles = JSON.parse(localStorage.getItem('roles') || '[]')
+  let menus = JSON.parse(localStorage.getItem('menus') || '[]')
 
   function getRecords() {
     return api.get('/records')
@@ -41,40 +43,79 @@ export function useProfitStore() {
   }
 
   /** 登录 */
-  function login(username, password) {
-    return api.post('/auth/login', { username, password })
+  function login(usernameVal, password) {
+    return api.post('/auth/login', { username: usernameVal, password })
       .then(res => {
         if (res.data.code === 200) {
-          const { token: t, username: u, userId: uid, roleLevel: rl, roleName: rn } = res.data.data
+          const { token: t, username: u, userId: uid } = res.data.data
           saveToken(t)
           localStorage.setItem('username', u)
           localStorage.setItem('userId', uid || '')
-          localStorage.setItem('roleLevel', rl || 1)
-          localStorage.setItem('roleName', rn || '')
           token = t
           username = u
-          roleLevel = rl || 1
-          return true
+          userId = uid
+
+          // 新：登录后加载权限
+          return loadPermissions().then(() => true)
+        }
+        throw new Error(res.data.msg || '登录失败')
+      })
+  }
+
+  /** 手机号+验证码登录 */
+  function phoneLogin(phone, code) {
+    return api.post('/auth/phone-login', { phone, code })
+      .then(res => {
+        if (res.data.code === 200) {
+          const { token: t, username: u, userId: uid } = res.data.data
+          saveToken(t)
+          localStorage.setItem('username', u)
+          localStorage.setItem('userId', uid || '')
+          token = t
+          username = u
+          userId = uid
+
+          // 新：登录后加载权限
+          return loadPermissions().then(() => true)
         }
         throw new Error(res.data.msg || '登录失败')
       })
   }
 
   /** 注册 */
-  function register(username, password, nickname, phone, code) {
-    return api.post('/auth/register', { username, password, nickname, phone, code })
+  function register(usernameVal, password, nickname, phone, code) {
+    return api.post('/auth/register', { username: usernameVal, password, nickname, phone, code })
       .then(res => {
         if (res.data.code === 200) {
-          const { token: t, userId: uid, roleLevel: rl, roleName: rn } = res.data.data
+          const { token: t, userId: uid } = res.data.data
           saveToken(t)
           localStorage.setItem('userId', uid || '')
-          localStorage.setItem('roleLevel', rl || 1)
-          localStorage.setItem('roleName', rn || '')
           token = t
-          roleLevel = rl || 1
-          return true
+          userId = uid
+
+          // 新：登录后加载权限
+          return loadPermissions().then(() => true)
         }
         throw new Error(res.data.msg || '注册失败')
+      })
+  }
+
+  /** 加载用户权限和菜单 */
+  function loadPermissions() {
+    return api.get('/auth/permissions')
+      .then(res => {
+        if (res.data.code === 200) {
+          const data = res.data.data
+          permissions = data.permissions || []
+          roles = data.roles || []
+          menus = data.menus || []
+          
+          localStorage.setItem('permissions', JSON.stringify(permissions))
+          localStorage.setItem('roles', JSON.stringify(roles))
+          localStorage.setItem('menus', JSON.stringify(menus))
+          return true
+        }
+        return false
       })
   }
 
@@ -89,9 +130,31 @@ export function useProfitStore() {
       })
   }
 
+  /** 发送重置密码验证码（只需手机号） */
+  function sendResetCode(phone) {
+    return api.post('/auth/send-reset-code', { phone })
+      .then(res => {
+        if (res.data.code === 200) {
+          return true
+        }
+        throw new Error(res.data.msg || '发送验证码失败')
+      })
+  }
+
+  /** 发送登录验证码（手机号登录专用） */
+  function sendLoginCode(phone) {
+    return api.post('/auth/send-login-code', { phone })
+      .then(res => {
+        if (res.data.code === 200) {
+          return true
+        }
+        throw new Error(res.data.msg || '发送验证码失败')
+      })
+  }
+
   /** 发送验证码 */
-  function sendVerificationCode(username, phone) {
-    return api.post('/auth/send-code', { username, phone })
+  function sendVerificationCode(usernameVal, phone) {
+    return api.post('/auth/send-code', { username: usernameVal, phone })
       .then(res => {
         if (res.data.code === 200) {
           return true
@@ -116,38 +179,44 @@ export function useProfitStore() {
     clearToken()
     token = null
     username = ''
-    roleLevel = 1
     userId = null
+    permissions = []
+    roles = []
+    menus = []
     localStorage.removeItem('username')
     localStorage.removeItem('userId')
-    localStorage.removeItem('roleLevel')
-    localStorage.removeItem('roleName')
+    localStorage.removeItem('permissions')
+    localStorage.removeItem('roles')
+    localStorage.removeItem('menus')
   }
 
-  /** 获取当前用户角色等级 */
-  function getRoleLevel() {
-    return roleLevel
+  /** 检查是否有指定权限 */
+  function hasPermission(code) {
+    return permissions.includes(code)
   }
 
-  /** 获取当前用户角色名称 */
-  function getRoleName() {
-    return localStorage.getItem('roleName') || ''
+  /** 检查是否有指定角色 */
+  function hasRole(role) {
+    return roles.includes(role)
   }
 
   /** 是否是管理员 */
   function isAdmin() {
-    return roleLevel >= 100
+    return roles.includes('ADMIN') || permissions.includes('user:manage')
   }
 
   return {
     get token() { return token },
     get username() { return username },
     get userId() { return userId },
-    get roleLevel() { return roleLevel },
-    get roleName() { return getRoleName() },
+    get permissions() { return permissions },
+    get roles() { return roles },
+    get menus() { return menus },
+    hasPermission,
+    hasRole,
     isAdmin,
     getRecords, addRecord, deleteRecord, getStats, getChartRecords,
-    formatMoney, login, register, sendVerificationCode, sendRegisterCode, resetPasswordWithCode, logout,
-    getRoleLevel, getRoleName
+    formatMoney, login, phoneLogin, register, sendVerificationCode, sendLoginCode, sendResetCode, sendRegisterCode, resetPasswordWithCode, logout,
+    loadPermissions
   }
 }

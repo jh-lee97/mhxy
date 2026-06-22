@@ -1,15 +1,23 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useProfitStore } from '../stores/profitStore.js'
+import { getStats, getRecords } from '../api/record.js'
+import { formatMoney } from '../utils/format.js'
 
-const store = useProfitStore()
+const loading = ref(false)
 const stats = ref(null)
 const records = ref([])
 
 async function loadData() {
-  const [s, r] = await Promise.all([store.getStats(), store.getRecords()])
-  stats.value = s
-  records.value = r || []
+  loading.value = true
+  try {
+    const [s, r] = await Promise.all([getStats(), getRecords()])
+    stats.value = s?.data?.code === 200 ? s.data.data : null
+    records.value = r?.data?.code === 200 ? r.data.data : []
+  } catch (e) {
+    console.error('加载数据失败:', e)
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(loadData)
@@ -24,18 +32,18 @@ function getProfitClass(value) {
     <div class="stat-cards">
       <div class="card today">
         <div class="card-label">今日收入</div>
-        <div class="card-value income">{{ store.formatMoney(stats?.todayIncome) }}</div>
-        <div class="card-sub">成本: {{ store.formatMoney(stats?.todayCost) }} | 净利: <span :class="getProfitClass(stats?.todayProfit)">{{ store.formatMoney(stats?.todayProfit) }}</span></div>
+        <div class="card-value income">{{ formatMoney(stats?.todayIncome) }}</div>
+        <div class="card-sub">成本: {{ formatMoney(stats?.todayCost) }} | 净利: <span :class="getProfitClass(stats?.todayProfit)">{{ formatMoney(stats?.todayProfit) }}</span></div>
       </div>
       <div class="card today">
         <div class="card-label">本周收入</div>
-        <div class="card-value income">{{ store.formatMoney(stats?.weekIncome) }}</div>
-        <div class="card-sub">成本: {{ store.formatMoney(stats?.weekCost) }} | 净利: <span :class="getProfitClass(stats?.weekProfit)">{{ store.formatMoney(stats?.weekProfit) }}</span></div>
+        <div class="card-value income">{{ formatMoney(stats?.weekIncome) }}</div>
+        <div class="card-sub">成本: {{ formatMoney(stats?.weekCost) }} | 净利: <span :class="getProfitClass(stats?.weekProfit)">{{ formatMoney(stats?.weekProfit) }}</span></div>
       </div>
       <div class="card today">
         <div class="card-label">累计收入</div>
-        <div class="card-value income">{{ store.formatMoney(stats?.totalIncome) }}</div>
-        <div class="card-sub">总成本: {{ store.formatMoney(stats?.totalCost) }} | 总净利: <span :class="getProfitClass(stats?.totalProfit)">{{ store.formatMoney(stats?.totalProfit) }}</span></div>
+        <div class="card-value income">{{ formatMoney(stats?.totalIncome) }}</div>
+        <div class="card-sub">总成本: {{ formatMoney(stats?.totalCost) }} | 总净利: <span :class="getProfitClass(stats?.totalProfit)">{{ formatMoney(stats?.totalProfit) }}</span></div>
       </div>
       <div class="card today">
         <div class="card-label">记录总数</div>

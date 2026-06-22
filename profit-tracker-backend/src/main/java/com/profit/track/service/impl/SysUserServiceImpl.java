@@ -5,8 +5,12 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.profit.track.dto.*;
 import com.profit.track.entity.SysRole;
 import com.profit.track.entity.SysUser;
+import com.profit.track.entity.SysUserRole;
 import com.profit.track.mapper.SysRoleMapper;
 import com.profit.track.mapper.SysUserMapper;
+import com.profit.track.mapper.SysUserRoleMapper;
+import com.profit.track.service.SysPermissionService;
+import com.profit.track.service.SysUserRoleService;
 import com.profit.track.service.SysUserService;
 import com.profit.track.util.JwtUtil;
 import com.profit.track.util.VerificationCodeUtil;
@@ -28,7 +32,10 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final SysRoleMapper sysRoleMapper;
+    private final SysUserRoleMapper sysUserRoleMapper;
     private final VerificationCodeUtil verificationCodeUtil;
+    private final SysPermissionService sysPermissionService;
+    private final SysUserRoleService sysUserRoleService;
 
     @Override
     public LoginResponse login(LoginRequest request) {
@@ -48,16 +55,33 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             throw new RuntimeException("用户名或密码错误");
         }
 
-        // 获取角色信息
-        SysRole role = sysRoleMapper.selectById(user.getRoleId());
-        String roleName = role != null ? role.getRoleName() : "";
-        Integer roleLevel = role != null ? role.getRoleLevel() : 1;
+        // 通过 RBAC 服务获取完整的用户信息和权限
+        return sysUserRoleService.enrichLoginResponse(user.getId());
+    }
 
-        // 生成 Token
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), roleName);
+    @Override
+    public LoginResponse phoneLogin(PhoneLoginRequest request) {
+        // 查找用户
+        SysUser user = getByPhone(request.getPhone());
+        if (user == null) {
+            throw new RuntimeException("手机号未注册");
+        }
 
-        return new LoginResponse(token, user.getId(), user.getUsername(),
-                user.getNickname(), user.getRoleId(), roleLevel, roleName);
+        // 验证状态
+        if (user.getStatus() != null && user.getStatus() == 0) {
+            throw new RuntimeException("账号已被禁用");
+        }
+
+        // 验证验证码
+        if (request.getCode() == null || request.getCode().trim().isEmpty()) {
+            throw new RuntimeException("请输入验证码");
+        }
+        if (!verificationCodeUtil.verifyCode("login", request.getPhone(), request.getCode())) {
+            throw new RuntimeException("验证码错误或已过期");
+        }
+
+        // 通过 RBAC 服务获取完整的用户信息和权限
+        return sysUserRoleService.enrichLoginResponse(user.getId());
     }
 
     @Override
@@ -71,7 +95,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         if (request.getCode() == null || request.getCode().trim().isEmpty()) {
             throw new RuntimeException("请输入验证码");
         }
-        if (!verificationCodeUtil.verifyCode(request.getPhone(), request.getCode())) {
+        if (!verificationCodeUtil.verifyCode("register", request.getPhone(), request.getCode())) {
             throw new RuntimeException("验证码错误或已过期");
         }
 
@@ -95,7 +119,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         user.setNickname(request.getNickname() != null ? request.getNickname() : request.getUsername());
         user.setPhone(request.getPhone());
         user.setEmail(request.getEmail());
-        user.setRoleId(request.getRoleId() != null ? request.getRoleId() : 1L);
         user.setStatus(1);
         LocalDateTime now = LocalDateTime.now();
         user.setCreatedAt(now);
@@ -103,41 +126,21 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         save(user);
 
-        // 获取角色信息
-        SysRole role = sysRoleMapper.selectById(user.getRoleId());
-        String roleName = role != null ? role.getRoleName() : "";
-        Integer roleLevel = role != null ? role.getRoleLevel() : 1;
+        // 默认分配 USER 角色
+        LambdaQueryWrapper<SysRole> roleWrapper = new LambdaQueryWrapper<>();
+        roleWrapper.eq(SysRole::getRoleCode, "USER");
+        SysRole userRole = sysRoleMapper.selectOne(roleWrapper);
+        if (userRole != null) {
+            sysUserRoleService.assignRoleToUser(user.getId(), userRole.getId());
+        }
 
-        // 生成 Token
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), roleName);
-
-        return new LoginResponse(token, user.getId(), user.getUsername(),
-                user.getNickname(), user.getRoleId(), roleLevel, roleName);
+        // 通过 RBAC 服务获取完整的用户信息和权限
+        return sysUserRoleService.enrichLoginResponse(user.getId());
     }
 
     @Override
     public UserInfoResponse getUserInfo(Long userId) {
-        SysUser user = getById(userId);
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
-
-        SysRole role = sysRoleMapper.selectById(user.getRoleId());
-
-        UserInfoResponse response = new UserInfoResponse();
-        response.setId(user.getId());
-        response.setUsername(user.getUsername());
-        response.setNickname(user.getNickname());
-        response.setPhone(user.getPhone());
-        response.setEmail(user.getEmail());
-        response.setAvatar(user.getAvatar());
-        response.setRoleId(user.getRoleId());
-        response.setRoleLevel(role != null ? role.getRoleLevel() : 1);
-        response.setRoleName(role != null ? role.getRoleName() : "");
-        response.setStatus(user.getStatus());
-        response.setCreatedAt(user.getCreatedAt());
-
-        return response;
+        return sysUserRoleService.getUserInfoWithRoles(userId);
     }
 
     @Override
@@ -168,7 +171,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
 
         // 验证验证码
-        if (!verificationCodeUtil.verifyCode(phone, code)) {
+        if (!verificationCodeUtil.verifyCode("reset", phone, code)) {
             throw new RuntimeException("验证码错误或已过期");
         }
 
@@ -192,7 +195,21 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
 
         // 发送验证码（存入 Redis + 打印到控制台）
-        verificationCodeUtil.sendCode(phone);
+        verificationCodeUtil.sendCode("login", phone);
+    }
+
+    @Override
+    public void sendLoginCode(String phone) {
+        // 根据手机号查找用户
+        SysUser user = getByPhone(phone);
+        if (user == null) {
+            throw new RuntimeException("该手机号未注册");
+        }
+        // 检查状态
+        if (user.getStatus() != null && user.getStatus() == 0) {
+            throw new RuntimeException("该账号已被禁用");
+        }
+        verificationCodeUtil.sendCode("login", phone);
     }
 
     @Override
@@ -200,7 +217,25 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         if (phone == null || !phone.matches("^1[3-9]\\d{9}$")) {
             throw new RuntimeException("手机号格式不正确");
         }
-        verificationCodeUtil.sendCode(phone);
+        // 校验手机号是否已被注册，已注册的不能再发送注册验证码
+        SysUser existing = getByPhone(phone);
+        if (existing != null) {
+            throw new RuntimeException("该手机号已被注册，请直接登录");
+        }
+        verificationCodeUtil.sendCode("register", phone);
+    }
+
+    @Override
+    public void sendResetCode(String phone) {
+        if (phone == null || !phone.matches("^1[3-9]\\d{9}$")) {
+            throw new RuntimeException("手机号格式不正确");
+        }
+        // 校验手机号是否存在
+        SysUser user = getByPhone(phone);
+        if (user == null) {
+            throw new RuntimeException("该手机号未注册");
+        }
+        verificationCodeUtil.sendCode("reset", phone);
     }
 
     @Override
@@ -211,21 +246,20 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     }
 
     @Override
-    public List<UserInfoResponse> listUsers(Integer roleLevel) {
-        // 只有管理员可以查看用户列表
-        if (!isSuperAdmin(roleLevel)) {
-            throw new RuntimeException("无权访问用户列表");
-        }
+    public SysUser getByPhone(String phone) {
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SysUser::getPhone, phone);
+        return getOne(wrapper);
+    }
+
+    @Override
+    public List<UserInfoResponse> listUsers() {
         List<SysUser> users = list();
         return users.stream().map(this::toUserInfoResponse).collect(Collectors.toList());
     }
 
     @Override
-    public void updateUserStatus(Long userId, Integer status, Integer roleLevel) {
-        // 只有管理员可以修改用户状态
-        if (!isSuperAdmin(roleLevel)) {
-            throw new RuntimeException("无权管理用户状态");
-        }
+    public void updateUserStatus(Long userId, Integer status) {
         SysUser user = getById(userId);
         if (user == null) {
             throw new RuntimeException("用户不存在");
@@ -236,25 +270,13 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     }
 
     @Override
-    public void assignRole(Long userId, Long roleId, Integer roleLevel) {
-        // 只有管理员可以分配角色
-        if (!isSuperAdmin(roleLevel)) {
-            throw new RuntimeException("无权分配角色");
-        }
+    public void assignRole(Long userId, Long roleId) {
         SysUser user = getById(userId);
         if (user == null) {
             throw new RuntimeException("用户不存在");
         }
-        user.setRoleId(roleId);
-        // 同时更新角色等级
-        SysRole role = sysRoleMapper.selectById(roleId);
-        user.setRoleLevel(role != null ? role.getRoleLevel() : 1);
-        user.setUpdatedAt(LocalDateTime.now());
-        updateById(user);
-    }
-
-    private boolean isSuperAdmin(Integer roleLevel) {
-        return roleLevel != null && roleLevel >= 100;
+        // 分配角色（支持多角色）
+        sysUserRoleService.assignRoleToUser(userId, roleId);
     }
 
     private UserInfoResponse toUserInfoResponse(SysUser user) {
@@ -265,8 +287,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         response.setPhone(user.getPhone());
         response.setEmail(user.getEmail());
         response.setAvatar(user.getAvatar());
-        response.setRoleId(user.getRoleId());
-        response.setRoleLevel(user.getRoleLevel());
         response.setStatus(user.getStatus());
         response.setCreatedAt(user.getCreatedAt());
         return response;

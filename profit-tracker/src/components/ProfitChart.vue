@@ -7,11 +7,10 @@ import { LineChart } from 'echarts/charts'
 import {
   TitleComponent, TooltipComponent, GridComponent, LegendComponent,
 } from 'echarts/components'
-import { useProfitStore } from '../stores/profitStore.js'
+import { getChartRecords } from '../api/record.js'
 
 use([CanvasRenderer, LineChart, TitleComponent, TooltipComponent, GridComponent, LegendComponent])
 
-const store = useProfitStore()
 const chartData = ref([])
 
 const option = computed(() => {
@@ -52,7 +51,8 @@ const option = computed(() => {
 })
 
 async function updateChart() {
-  chartData.value = await store.getChartRecords()
+  const res = await getChartRecords()
+  chartData.value = res?.data?.code === 200 ? res.data.data : []
 }
 
 onMounted(updateChart)

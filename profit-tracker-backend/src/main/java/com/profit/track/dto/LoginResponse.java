@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -31,4 +33,10 @@ public class LoginResponse {
 
     @Schema(description = "角色名称")
     private String roleName;
+
+    @Schema(description = "权限标识列表")
+    private List<String> permissions;
+
+    @Schema(description = "角色编码列表")
+    private List<String> roles;
 }
