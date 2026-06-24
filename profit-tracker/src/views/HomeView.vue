@@ -7,6 +7,7 @@ import AddRecordForm from '../components/AddRecordForm.vue'
 import RecordList from '../components/RecordList.vue'
 import ProfitChart from '../components/ProfitChart.vue'
 import GameGuideSection from '../components/GameGuideSection.vue'
+import TaskChecklist from '../components/TaskChecklist.vue'
 import { useAuthStore } from '../stores/authStore.js'
 import { addRecord as apiAddRecord } from '../api/record.js'
 
@@ -76,6 +77,13 @@ onMounted(() => {
 
       <section class="section">
         <GameGuideSection />
+      </section>
+
+      <section class="section">
+        <div class="list-header">
+          <h3>📋 每日任务清单</h3>
+        </div>
+        <TaskChecklist />
       </section>
 
       <section class="section">

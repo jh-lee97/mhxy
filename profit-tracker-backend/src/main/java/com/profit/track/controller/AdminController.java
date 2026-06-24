@@ -160,6 +160,54 @@ public class AdminController {
         return Result.ok();
     }
 
+    // ==================== 菜单管理 ====================
+
+    /** 获取菜单树（按用户权限过滤） */
+    @GetMapping("/menus")
+    @Operation(summary = "获取菜单树", description = "根据当前用户权限返回可访问的菜单树")
+    public Result<List<MenuTreeNode>> getMenuTree(
+            javax.servlet.http.HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.fail(401, "未登录");
+        }
+        return Result.ok(sysPermissionService.getMenuTree(userId));
+    }
+
+    /** 获取所有菜单（管理员，不分权限） */
+    @GetMapping("/menus/all")
+    @Operation(summary = "获取所有菜单", description = "返回系统中所有启用的菜单（管理员专用）")
+    public Result<List<MenuTreeNode>> listAllMenus() {
+        return Result.ok(sysPermissionService.getAllMenuTree());
+    }
+
+    /** 创建菜单 */
+    @PostMapping("/menus")
+    @Operation(summary = "创建菜单")
+    public Result<PermissionResponse> createMenu(@Valid @RequestBody PermissionResponse request) {
+        request.setType(1); // 强制类型为菜单
+        return Result.ok(sysPermissionService.createPermission(request));
+    }
+
+    /** 更新菜单 */
+    @PutMapping("/menus/{id}")
+    @Operation(summary = "更新菜单")
+    public Result<PermissionResponse> updateMenu(
+            @PathVariable Long id,
+            @Valid @RequestBody PermissionResponse request) {
+        request.setId(id);
+        request.setType(1); // 强制类型为菜单
+        return Result.ok(sysPermissionService.updatePermission(request));
+    }
+
+    /** 删除菜单 */
+    @DeleteMapping("/menus/{id}")
+    @Operation(summary = "删除菜单")
+    public Result<Void> deleteMenu(@PathVariable Long id) {
+        sysPermissionService.deletePermission(id);
+        return Result.ok();
+    }
+
     // ==================== 权限管理 ====================
 
     /** 获取所有权限（树形结构） */

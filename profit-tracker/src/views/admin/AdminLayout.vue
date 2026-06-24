@@ -1,30 +1,82 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/authStore.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   UserFilled,
   Key,
   Lock,
-  DArrowLeft,
   Fold,
   Expand,
-  Reading
+  Reading,
+  List
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const route = useRoute()
 const store = useAuthStore()
 
 const activeMenu = ref('users')
 const sidebarCollapsed = ref(false)
 
-const menuItems = [
-  { key: 'users', label: '用户管理', icon: UserFilled },
-  { key: 'roles', label: '角色管理', icon: Key },
-  { key: 'permissions', label: '权限管理', icon: Lock },
-  { key: 'guides', label: '攻略管理', icon: Reading }
+// 固定的管理后台菜单项（只有管理员可访问）
+const fixedAdminMenus = [
+  { key: 'users', path: '/admin/users', label: '用户管理', icon: UserFilled },
+  { key: 'roles', path: '/admin/roles', label: '角色管理', icon: Key },
+  { key: 'permissions', path: '/admin/permissions', label: '权限管理', icon: Lock },
+  { key: 'guides', path: '/admin/guides', label: '攻略管理', icon: Reading },
+  { key: 'tasks', path: '/admin/tasks', label: '任务计划', icon: List }
 ]
+
+// 从 authStore 读取动态菜单
+const dynamicMenus = computed(() => {
+  return store.menus || []
+})
+
+// 检查用户是否有某个菜单的访问权限
+function hasMenuAccess(menuKey) {
+  // 管理员默认有所有权限
+  if (store.roles && store.roles.includes('ADMIN')) {
+    return true
+  }
+  // 检查权限标识
+  const permissionMap = {
+    'users': 'user:manage',
+    'roles': 'role:manage',
+    'permissions': 'permission:manage',
+    'guides': 'guide:manage',
+    'tasks': 'task:view'
+  }
+  const permission = permissionMap[menuKey]
+  if (!permission) return true
+  return store.permissions && store.permissions.includes(permission)
+}
+
+// 过滤出当前用户有权限访问的菜单
+const accessibleMenus = computed(() => {
+  return fixedAdminMenus.filter(menu => hasMenuAccess(menu.key))
+})
+
+// 根据当前路由获取激活的菜单 key
+function getActiveMenuKey() {
+  const fullPath = route.fullPath
+  // 如果是管理后台路由，提取 key
+  const adminMatch = fullPath.match(/^\/admin\/(\w+)/)
+  if (adminMatch) {
+    return adminMatch[1]
+  }
+  return accessibleMenus.value[0]?.key || 'users'
+}
+
+// 监听路由变化，更新激活菜单
+watch(() => route.path, () => {
+  activeMenu.value = getActiveMenuKey()
+})
+
+onMounted(() => {
+  activeMenu.value = getActiveMenuKey()
+})
 
 function handleMenuSelect(key) {
   activeMenu.value = key
@@ -72,7 +124,7 @@ function toggleSidebar() {
         active-text-color="#409EFF"
         @select="handleMenuSelect"
       >
-        <el-menu-item v-for="item in menuItems" :key="item.key" :index="item.key">
+        <el-menu-item v-for="item in accessibleMenus" :key="item.key" :index="item.key">
           <el-icon><component :is="item.icon" /></el-icon>
           <template #title>{{ item.label }}</template>
         </el-menu-item>
@@ -90,7 +142,7 @@ function toggleSidebar() {
           <el-breadcrumb separator="/">
             <el-breadcrumb-item><a @click="handleBack">工作台</a></el-breadcrumb-item>
             <el-breadcrumb-item>
-              {{ menuItems.find(m => m.key === activeMenu)?.label || '管理台' }}
+              {{ accessibleMenus.find(m => m.key === activeMenu)?.label || '管理台' }}
             </el-breadcrumb-item>
           </el-breadcrumb>
         </div>

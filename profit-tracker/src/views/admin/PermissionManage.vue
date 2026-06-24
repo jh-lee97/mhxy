@@ -2,7 +2,6 @@
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getPermissions, createPermission, updatePermission, deletePermission } from '../../api/admin.js'
-import { useAuthStore } from '../../stores/authStore.js'
 
 const loading = ref(false)
 const permissionList = ref([])
@@ -103,6 +102,13 @@ function handleSubmit() {
 }
 
 function handleDelete(row) {
+  // 检查是否有子权限
+  const hasChildren = permissionList.value.some(p => p.parentId === row.id)
+  if (hasChildren) {
+    ElMessage.warning('请先删除子权限')
+    return
+  }
+  
   ElMessageBox.confirm(`确定要删除权限 "${row.name}" 吗？`, '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
@@ -120,6 +126,26 @@ function handleDelete(row) {
 function getTypeLabel(type) {
   const opt = typeOptions.find(o => o.value === type)
   return opt ? opt.label : '-'
+}
+
+// 获取父级权限名称
+function getParentName(parentId) {
+  if (!parentId || parentId === 0) return '顶级'
+  // 扁平列表中查找
+  const flatList = flattenPermissions(permissionList.value)
+  const parent = flatList.find(p => p.id === parentId)
+  return parent ? parent.name : '未知'
+}
+
+function flattenPermissions(tree) {
+  let result = []
+  tree.forEach(node => {
+    result.push(node)
+    if (node.children && node.children.length > 0) {
+      result = result.concat(flattenPermissions(node.children))
+    }
+  })
+  return result
 }
 
 onMounted(loadData)
@@ -140,16 +166,36 @@ onMounted(loadData)
       </div>
 
       <el-table :data="filteredList" border stripe row-key="id" default-expand-all>
-        <el-table-column prop="name" label="名称" min-width="150" />
+        <el-table-column prop="name" label="名称" min-width="150">
+          <template #default="{ row }">
+            <span v-if="row.parentId === 0 || !row.parentId" style="font-weight: bold;">
+              {{ row.name }}
+            </span>
+            <span v-else style="padding-left: 20px; color: #606266;">
+              └─ {{ row.name }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column prop="code" label="权限标识" width="200" />
         <el-table-column label="类型" width="100">
           <template #default="{ row }">
             <el-tag :type="typeColors[row.type]" size="small">{{ getTypeLabel(row.type) }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="父级" width="120">
+          <template #default="{ row }">
+            {{ getParentName(row.parentId) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="path" label="路径" width="200" />
         <el-table-column prop="method" label="方法" width="100" />
         <el-table-column prop="sortOrder" label="排序" width="80" />
+        <el-table-column label="图标" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.icon" size="small">{{ row.icon }}</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small">
@@ -161,7 +207,12 @@ onMounted(loadData)
           <template #default="{ row }">
             <el-button size="small" type="success" @click="openCreateDialog(row.id)">新增子权限</el-button>
             <el-button size="small" type="primary" @click="openEditDialog(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button
+              v-if="!permissionList.some(p => p.parentId === row.id)"
+              size="small"
+              type="danger"
+              @click="handleDelete(row)"
+            >删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -171,13 +222,21 @@ onMounted(loadData)
     <el-dialog v-model="dialogVisible" :title="editingPerm ? '编辑权限' : '新增权限'" width="550px">
       <el-form :model="formData" label-width="100px">
         <el-form-item label="上级权限">
-          <el-input :model-value="formData.parentId === 0 ? '顶级' : '子权限'" disabled />
+          <el-select v-model="formData.parentId" style="width: 100%" clearable>
+            <el-option label="顶级权限" :value="0" />
+            <el-option
+              v-for="item in flattenPermissions(permissionList)"
+              :key="item.id"
+              :label="item.name"
+              :value="item.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="权限名称" required>
-          <el-input v-model="formData.name" placeholder="如: 新增记录" />
+          <el-input v-model="formData.name" placeholder="如: 收益记录" />
         </el-form-item>
         <el-form-item label="权限标识" required>
-          <el-input v-model="formData.code" placeholder="如: record:add" />
+          <el-input v-model="formData.code" placeholder="如: record" />
         </el-form-item>
         <el-form-item label="类型">
           <el-select v-model="formData.type" style="width: 100%">
@@ -185,7 +244,7 @@ onMounted(loadData)
           </el-select>
         </el-form-item>
         <el-form-item label="路径">
-          <el-input v-model="formData.path" placeholder="/api/records" />
+          <el-input v-model="formData.path" placeholder="/records 或 /api/records" />
         </el-form-item>
         <el-form-item label="HTTP方法">
           <el-select v-model="formData.method" placeholder="选择方法" clearable style="width: 100%">
@@ -199,7 +258,7 @@ onMounted(loadData)
           <el-input-number v-model="formData.sortOrder" :min="0" />
         </el-form-item>
         <el-form-item label="图标">
-          <el-input v-model="formData.icon" placeholder="Element Plus 图标名" />
+          <el-input v-model="formData.icon" placeholder="Element Plus 图标名，如: MoneyBag" />
         </el-form-item>
         <el-form-item label="状态">
           <el-radio-group v-model="formData.status">

@@ -50,23 +50,37 @@ public class SysPermissionServiceImpl implements SysPermissionService {
     public List<MenuTreeNode> getMenuTree(Long userId) {
         List<SysPermission> allPermissions = permissionMapper.selectByUserId(userId);
         
-        // 过滤出菜单类型（type=1）
+        // 过滤出菜单类型（type=1）且启用的
         List<SysPermission> menus = allPermissions.stream()
-                .filter(p -> p.getType() != null && p.getType() == 1)
+                .filter(p -> p.getType() != null && p.getType() == 1 && p.getStatus() != null && p.getStatus() == 1)
                 .sorted(Comparator.comparingInt(p -> p.getSortOrder() != null ? p.getSortOrder() : 0))
                 .collect(Collectors.toList());
 
         // 构建树形结构
-        return buildMenuTree(menus, allPermissions, null);
+        return buildMenuTree(menus, null);
     }
 
-    private List<MenuTreeNode> buildMenuTree(List<SysPermission> menus, List<SysPermission> allPermissions, Long parentId) {
+    @Override
+    public List<MenuTreeNode> getAllMenuTree() {
+        // 获取所有启用的菜单类型权限
+        LambdaQueryWrapper<SysPermission> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SysPermission::getType, 1)
+               .eq(SysPermission::getStatus, 1)
+               .orderByAsc(SysPermission::getSortOrder);
+        List<SysPermission> menus = permissionMapper.selectList(wrapper);
+        return buildMenuTree(menus, null);
+    }
+
+    /** 构建菜单树 */
+    private List<MenuTreeNode> buildMenuTree(List<SysPermission> menus, Long parentId) {
         List<MenuTreeNode> result = new ArrayList<>();
         
         for (SysPermission menu : menus) {
-            if ((parentId == null && menu.getParentId() == null) || 
-                (parentId != null && parentId.equals(menu.getParentId()))) {
-                
+            Long menuParentId = menu.getParentId();
+            boolean isChild = (parentId == null && menuParentId != null && menuParentId > 0) ||
+                              (parentId != null && parentId.equals(menuParentId));
+            
+            if (parentId == null && (menuParentId == null || menuParentId == 0)) {
                 MenuTreeNode node = new MenuTreeNode();
                 node.setId(menu.getId());
                 node.setParentId(menu.getParentId());
@@ -76,8 +90,21 @@ public class SysPermissionServiceImpl implements SysPermissionService {
                 node.setIcon(menu.getIcon());
                 node.setSortOrder(menu.getSortOrder());
                 
-                // 递归查找子节点
-                List<MenuTreeNode> children = buildMenuTree(menus, allPermissions, menu.getId());
+                List<MenuTreeNode> children = buildMenuTree(menus, menu.getId());
+                node.setChildren(children);
+                
+                result.add(node);
+            } else if (isChild) {
+                MenuTreeNode node = new MenuTreeNode();
+                node.setId(menu.getId());
+                node.setParentId(menu.getParentId());
+                node.setName(menu.getName());
+                node.setPath(menu.getPath());
+                node.setCode(menu.getCode());
+                node.setIcon(menu.getIcon());
+                node.setSortOrder(menu.getSortOrder());
+                
+                List<MenuTreeNode> children = buildMenuTree(menus, menu.getId());
                 node.setChildren(children);
                 
                 result.add(node);

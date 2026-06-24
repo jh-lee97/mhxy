@@ -1,6 +1,42 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { getUserPermissions } from '../api/auth.js'
+import { useAuthStore } from '../stores/authStore.js'
 
+// 管理后台子路由配置
+const adminRoutes = [
+  {
+    path: 'users',
+    name: 'UserManage',
+    component: () => import('../views/admin/UserManage.vue'),
+    meta: { title: '用户管理', icon: 'UserFilled' }
+  },
+  {
+    path: 'roles',
+    name: 'RoleManage',
+    component: () => import('../views/admin/RoleManage.vue'),
+    meta: { title: '角色管理', icon: 'Key' }
+  },
+  {
+    path: 'permissions',
+    name: 'PermissionManage',
+    component: () => import('../views/admin/PermissionManage.vue'),
+    meta: { title: '权限管理', icon: 'Lock' }
+  },
+  {
+    path: 'guides',
+    name: 'GuideManage',
+    component: () => import('../views/admin/GuideManage.vue'),
+    meta: { title: '攻略管理', icon: 'Reading' }
+  },
+  {
+    path: 'tasks',
+    name: 'TaskPlanManage',
+    component: () => import('../views/admin/TaskPlanManage.vue'),
+    meta: { title: '任务计划管理', icon: 'List' }
+  }
+]
+
+// 构建路由表
 const routes = [
   {
     path: '/login',
@@ -18,32 +54,7 @@ const routes = [
     redirect: '/admin/users',
     component: () => import('../views/admin/AdminLayout.vue'),
     meta: { requiresAdmin: true, title: '管理后台' },
-    children: [
-      {
-        path: 'users',
-        name: 'UserManage',
-        component: () => import('../views/admin/UserManage.vue'),
-        meta: { title: '用户管理' }
-      },
-      {
-        path: 'roles',
-        name: 'RoleManage',
-        component: () => import('../views/admin/RoleManage.vue'),
-        meta: { title: '角色管理' }
-      },
-      {
-        path: 'permissions',
-        name: 'PermissionManage',
-        component: () => import('../views/admin/PermissionManage.vue'),
-        meta: { title: '权限管理' }
-      },
-      {
-        path: 'guides',
-        name: 'GuideManage',
-        component: () => import('../views/admin/GuideManage.vue'),
-        meta: { title: '攻略管理' }
-      }
-    ]
+    children: adminRoutes
   },
   {
     path: '/guide/:id',
@@ -61,7 +72,8 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach(async (to, from, next) => {
   const token = localStorage.getItem('token')
-  
+  const store = useAuthStore()
+
   // 未登录
   if (to.path !== '/login' && !token) {
     next('/login')
@@ -81,22 +93,23 @@ router.beforeEach(async (to, from, next) => {
       next('/')
       return
     }
+    
     // 加载权限（如果还没有缓存）
-    if (!localStorage.getItem('permissions')) {
+    if (!store.menus || store.menus.length === 0) {
       try {
         const res = await getUserPermissions()
         if (res.data.code === 200 && res.data.data) {
-          localStorage.setItem('permissions', JSON.stringify(res.data.data.permissions || []))
-          localStorage.setItem('roles', JSON.stringify(res.data.data.roles || []))
-          localStorage.setItem('menus', JSON.stringify(res.data.data.menus || []))
+          const permissions = res.data.data.permissions || []
+          const rolesList = res.data.data.roles || []
+          const menus = res.data.data.menus || []
+          
+          store.setAuthData(permissions, rolesList, menus)
         }
       } catch (err) {
         console.error('[路由守卫] 权限加载失败:', err)
         // 权限加载失败，清除 token 并跳转登录
+        store.clearAuth()
         localStorage.removeItem('token')
-        localStorage.removeItem('roles')
-        localStorage.removeItem('permissions')
-        localStorage.removeItem('menus')
         next('/login')
         return
       }

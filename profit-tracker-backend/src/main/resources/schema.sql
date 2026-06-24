@@ -99,12 +99,104 @@ INSERT INTO sys_role (role_name, role_code, role_level, description) VALUES ('�
 INSERT INTO sys_user (username, password, nickname, phone, role_id) VALUES ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHmM8lE9lBOsl7iKTVKIUi', '管理员', '13800138000', 1);
 
 -- ========================================
--- RBAC 改造说明
+-- RBAC 权限系统（内置于 schema.sql）
 -- ========================================
--- 如需启用 RBAC 改造，请执行 src/main/resources/schema_rbac.sql
--- 该脚本会新增 sys_permission / sys_role_permission / sys_user_role 三张表，
--- 并将现有 sys_user.role_id 数据迁移到 sys_user_role 关联表。
--- ========================================
+
+-- 权限表
+DROP TABLE IF EXISTS sys_permission;
+CREATE TABLE sys_permission (
+    id              BIGINT          NOT NULL AUTO_INCREMENT,
+    parent_id       BIGINT          DEFAULT 0 COMMENT '父级权限ID，0表示顶级',
+    name            VARCHAR(50)     NOT NULL COMMENT '权限名称',
+    code            VARCHAR(100)    NOT NULL COMMENT '权限标识',
+    type            TINYINT         DEFAULT 1 COMMENT '1-菜单 2-按钮 3-接口',
+    path            VARCHAR(200)    DEFAULT NULL,
+    method          VARCHAR(10)     DEFAULT NULL,
+    sort_order      INT             DEFAULT 0,
+    icon            VARCHAR(50)     DEFAULT NULL,
+    status          TINYINT         DEFAULT 1,
+    created_at      DATETIME        DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='权限表';
+
+-- 角色-权限关联表
+DROP TABLE IF EXISTS sys_role_permission;
+CREATE TABLE sys_role_permission (
+    id              BIGINT          NOT NULL AUTO_INCREMENT,
+    role_id         BIGINT          NOT NULL,
+    permission_id   BIGINT          NOT NULL,
+    created_at      DATETIME        DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_role_permission (role_id, permission_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色-权限关联表';
+
+-- 用户-角色关联表
+DROP TABLE IF EXISTS sys_user_role;
+CREATE TABLE sys_user_role (
+    id              BIGINT          NOT NULL AUTO_INCREMENT,
+    user_id         BIGINT          NOT NULL,
+    role_id         BIGINT          NOT NULL,
+    created_at      DATETIME        DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_role (user_id, role_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户-角色关联表';
+
+-- 迁移现有 role_id 到 sys_user_role
+INSERT INTO sys_user_role (user_id, role_id)
+SELECT id, role_id FROM sys_user WHERE role_id IS NOT NULL AND role_id > 0;
+
+-- 初始化权限数据
+-- 一级菜单
+SET @rec_id = (SELECT id FROM sys_permission WHERE code='record' LIMIT 1);
+SET @guide_id = (SELECT id FROM sys_permission WHERE code='guide' LIMIT 1);
+SET @task_id = (SELECT id FROM sys_permission WHERE code='task' LIMIT 1);
+SET @user_id = (SELECT id FROM sys_permission WHERE code='user' LIMIT 1);
+
+INSERT INTO sys_permission (name, code, type, path, sort_order, icon) VALUES
+('仪表盘', 'dashboard', 1, '/', 1, 'DashboardOutlined'),
+('收益记录', 'record', 1, '/records', 2, 'DollarOutlined'),
+('游戏攻略', 'guide', 1, '/guides', 3, 'BookOutlined'),
+('任务清单', 'task', 1, '/tasks', 4, 'ListOutlined'),
+('用户管理', 'user', 1, '/users', 5, 'UserOutlined');
+
+-- 收益记录 - 按钮/接口权限
+INSERT INTO sys_permission (name, code, type, parent_id, path, method, sort_order) VALUES
+('新增记录', 'record:add', 2, (SELECT id FROM sys_permission WHERE code='record'), '/api/records', 'POST', 1),
+('编辑记录', 'record:edit', 2, (SELECT id FROM sys_permission WHERE code='record'), '/api/records', 'PUT', 2),
+('删除记录', 'record:delete', 2, (SELECT id FROM sys_permission WHERE code='record'), '/api/records/{id}', 'DELETE', 3),
+('查看记录', 'record:view', 2, (SELECT id FROM sys_permission WHERE code='record'), '/api/records', 'GET', 4),
+('查看统计', 'record:stats', 2, (SELECT id FROM sys_permission WHERE code='record'), '/api/records/stats', 'GET', 5),
+('查看图表', 'record:chart', 2, (SELECT id FROM sys_permission WHERE code='record'), '/api/records/chart', 'GET', 6);
+
+-- 游戏攻略 - 按钮权限
+INSERT INTO sys_permission (name, code, type, parent_id, path, sort_order) VALUES
+('攻略管理', 'guide:manage', 2, (SELECT id FROM sys_permission WHERE code='guide'), '/api/admin/guides', 1);
+
+-- 任务清单 - 按钮/接口权限
+INSERT INTO sys_permission (name, code, type, parent_id, path, method, sort_order) VALUES
+('查看任务', 'task:view', 2, (SELECT id FROM sys_permission WHERE code='task'), '/api/tasks', 'GET', 1),
+('完成任务', 'task:edit', 2, (SELECT id FROM sys_permission WHERE code='task'), '/api/tasks/completion', 'POST', 2),
+('创建计划', 'task:add', 2, (SELECT id FROM sys_permission WHERE code='task'), '/api/tasks/plan', 'POST', 3),
+('删除计划', 'task:delete', 2, (SELECT id FROM sys_permission WHERE code='task'), '/api/tasks/plan/{id}', 'DELETE', 4),
+('查看统计', 'task:stats', 2, (SELECT id FROM sys_permission WHERE code='task'), '/api/tasks/stats', 'GET', 5);
+
+-- 用户管理 - 按钮权限
+INSERT INTO sys_permission (name, code, type, parent_id, path, sort_order) VALUES
+('用户管理', 'user:manage', 2, (SELECT id FROM sys_permission WHERE code='user'), '/api/admin/users', 1);
+
+-- 分配所有权限给 ADMIN 角色
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT 1, id FROM sys_permission;
+
+-- 分配基础权限给 USER 角色
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT 2, id FROM sys_permission
+WHERE code IN ('dashboard', 'record', 'guide', 'task',
+               'record:add', 'record:edit', 'record:delete', 'record:view', 'record:stats', 'record:chart',
+               'guide:manage',
+               'task:view', 'task:edit', 'task:add', 'task:delete', 'task:stats');
 INSERT INTO profit_record (user_id, date, mode, activity, income, cbg_income, 道具Income, cost, remark, created_at, updated_at)
 VALUES
     (1, '2025-06-07', '副本', '秘境宝图', 500000, 5000, 10000, 200000, '日常副本收益', NOW(), NOW()),

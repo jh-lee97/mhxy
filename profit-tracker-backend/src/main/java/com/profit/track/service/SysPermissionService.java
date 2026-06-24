@@ -16,6 +16,9 @@ public interface SysPermissionService {
     /** 根据用户ID获取菜单树 */
     List<MenuTreeNode> getMenuTree(Long userId);
 
+    /** 获取所有菜单树（管理员专用，不过滤权限） */
+    List<MenuTreeNode> getAllMenuTree();
+
     /** 根据角色ID获取权限列表 */
     List<PermissionResponse> getPermissionsByRoleId(Long roleId);
 
