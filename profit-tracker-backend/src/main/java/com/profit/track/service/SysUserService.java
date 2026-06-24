@@ -52,4 +52,7 @@ public interface SysUserService extends IService<SysUser> {
 
     /** 分配角色给用户（管理员） */
     void assignRole(Long userId, Long roleId);
+
+    /** 删除用户（管理员） */
+    void deleteUser(Long userId);
 }

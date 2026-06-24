@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getRoles, createRole, updateRole, deleteRole, getRolePermissions, assignRolePermissions } from '../../api/admin.js'
 import { getPermissions } from '../../api/admin.js'
+import { useAuthStore } from '../../stores/authStore.js'
 
 const loading = ref(false)
 const roleList = ref([])
@@ -147,7 +148,12 @@ onMounted(loadData)
           <template #default="{ row }">
             <el-button size="small" type="primary" @click="openPermissionDialog(row)">分配权限</el-button>
             <el-button size="small" type="warning" @click="openEditDialog(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button
+              v-if="row.roleCode !== 'ADMIN'"
+              size="small"
+              type="danger"
+              @click="handleDelete(row)"
+            >删除</el-button>
           </template>
         </el-table-column>
       </el-table>

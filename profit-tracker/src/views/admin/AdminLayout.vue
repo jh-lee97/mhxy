@@ -1,19 +1,20 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useProfitStore } from '../../stores/profitStore.js'
-import { ElMessage } from 'element-plus'
+import { useAuthStore } from '../../stores/authStore.js'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   UserFilled,
   Key,
   Lock,
-  SwitchButton,
-  Setting,
-  Back
+  DArrowLeft,
+  Fold,
+  Expand,
+  Reading
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
-const store = useProfitStore()
+const store = useAuthStore()
 
 const activeMenu = ref('users')
 const sidebarCollapsed = ref(false)
@@ -21,7 +22,8 @@ const sidebarCollapsed = ref(false)
 const menuItems = [
   { key: 'users', label: '用户管理', icon: UserFilled },
   { key: 'roles', label: '角色管理', icon: Key },
-  { key: 'permissions', label: '权限管理', icon: Lock }
+  { key: 'permissions', label: '权限管理', icon: Lock },
+  { key: 'guides', label: '攻略管理', icon: Reading }
 ]
 
 function handleMenuSelect(key) {
@@ -34,9 +36,17 @@ function handleBack() {
 }
 
 function handleLogout() {
-  store.logout()
-  ElMessage.success('已退出登录')
-  router.push('/login')
+  ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  }).then(() => {
+    store.clearAuth()
+    ElMessage.success('已退出登录')
+    router.push('/login')
+  }).catch(() => {
+    // 用户取消
+  })
 }
 
 function toggleSidebar() {
@@ -49,7 +59,9 @@ function toggleSidebar() {
     <!-- 侧边栏 -->
     <div class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
-        <el-icon :size="24" color="#409EFF"><SwitchButton /></el-icon>
+        <el-icon class="collapse-toggle" :size="20" @click="toggleSidebar">
+          <component :is="sidebarCollapsed ? Expand : Fold" />
+        </el-icon>
         <span v-show="!sidebarCollapsed" class="sidebar-title">后台管理</span>
       </div>
       <el-menu
@@ -73,7 +85,7 @@ function toggleSidebar() {
       <div class="header">
         <div class="header-left">
           <el-icon class="collapse-btn" @click="toggleSidebar" :size="20">
-            <component :is="sidebarCollapsed ? 'Expand' : 'Fold'" />
+            <component :is="sidebarCollapsed ? Expand : Fold" />
           </el-icon>
           <el-breadcrumb separator="/">
             <el-breadcrumb-item><a @click="handleBack">工作台</a></el-breadcrumb-item>
@@ -84,6 +96,7 @@ function toggleSidebar() {
         </div>
         <div class="header-right">
           <span class="username">{{ store.username }}</span>
+          <el-button type="primary" plain size="small" @click="handleBack">返回首页</el-button>
           <el-button type="danger" size="small" @click="handleLogout">退出</el-button>
         </div>
       </div>
@@ -108,6 +121,9 @@ function toggleSidebar() {
   background-color: #304156;
   transition: width 0.3s;
   overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar.collapsed {
@@ -118,10 +134,28 @@ function toggleSidebar() {
   height: 60px;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 10px;
+  padding: 0 16px;
   border-bottom: 1px solid #2d3a4b;
-  padding: 0 10px;
+  justify-content: flex-start;
+}
+
+.collapse-toggle {
+  cursor: pointer;
+  color: #fff;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.08);
+  transition: background-color 0.2s;
+}
+
+.collapse-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.16);
 }
 
 .sidebar-title {

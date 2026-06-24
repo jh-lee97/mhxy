@@ -34,6 +34,30 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ObjectMapper objectMapper;
 
+    /** 公开路径（无需认证） */
+    private static final String[] PUBLIC_PATHS = {
+            "/api/auth/login",
+            "/api/auth/register",
+            "/api/auth/phone-login",
+            "/api/auth/reset-password",
+            "/api/auth/send-code",
+            "/api/auth/send-login-code",
+            "/api/auth/send-register-code",
+            "/api/auth/send-reset-code",
+            "/api/auth/permissions",
+            "/api/guides",
+            "/api/guides/**"
+    };
+
+    /** Swagger 路径（无需认证） */
+    private static final String[] SWAGGER_PATHS = {
+            "/swagger-ui.html",
+            "/swagger-ui/**",
+            "/v3/api-docs/**",
+            "/swagger-resources/**",
+            "/webjars/**"
+    };
+
     /** 密码编码器 */
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -78,22 +102,15 @@ public class SecurityConfig {
                 .and()
                 // 配置授权规则
                 .authorizeHttpRequests(auth -> auth
-                        // ===== 公开接口：无需认证 =====
-                        .antMatchers("/api/auth/login", "/api/auth/register", "/api/auth/phone-login",
-                                "/api/auth/reset-password", "/api/auth/send-code",
-                                "/api/auth/send-login-code",
-                                "/api/auth/send-register-code", "/api/auth/send-reset-code",
-                                "/api/auth/permissions").permitAll()
-                        // Swagger 页面
-                        .antMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
-                                "/swagger-resources/**", "/webjars/**").permitAll()
+                        // 公开接口：无需认证
+                        .antMatchers(PUBLIC_PATHS).permitAll()
+                        // Swagger 文档
+                        .antMatchers(SWAGGER_PATHS).permitAll()
+                        // 允许 OPTIONS 预检请求
+                        .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ===== 管理员接口兜底：需要 ADMIN 角色 =====
-                        // 注意：Controller 上已有 @PreAuthorize 注解，此处为安全网
-                        .antMatchers(HttpMethod.GET, "/api/admin/**").hasRole("ADMIN")
-                        .antMatchers(HttpMethod.PUT, "/api/admin/**").hasRole("ADMIN")
-                        .antMatchers(HttpMethod.POST, "/api/admin/**").hasRole("ADMIN")
-                        .antMatchers(HttpMethod.DELETE, "/api/admin/**").hasRole("ADMIN")
+                        // 管理员接口：需要 ADMIN 角色
+                        .antMatchers("/api/admin/**").hasRole("ADMIN")
                         .antMatchers("/api/roles/**").hasRole("ADMIN")
 
                         // 默认需要认证（细粒度权限由 @PreAuthorize 控制）

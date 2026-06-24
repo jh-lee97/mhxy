@@ -17,6 +17,10 @@ export function resetUserPassword(userId, newPassword) {
   return api.post(`/admin/users/${userId}/reset-password`, { newPassword })
 }
 
+export function deleteUser(userId) {
+  return api.delete(`/admin/users/${userId}`)
+}
+
 /** 角色管理 */
 export function getRoles() {
   return api.get('/admin/roles')

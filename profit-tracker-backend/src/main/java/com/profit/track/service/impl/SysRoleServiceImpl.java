@@ -61,6 +61,13 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 
     @Override
     public void deleteRole(Long id) {
+        SysRole role = getById(id);
+        if (role == null) {
+            throw new RuntimeException("角色不存在");
+        }
+        if ("ADMIN".equals(role.getRoleCode())) {
+            throw new RuntimeException("不允许删除超级管理员角色");
+        }
         removeById(id);
     }
 

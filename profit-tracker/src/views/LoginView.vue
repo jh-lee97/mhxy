@@ -1,10 +1,11 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useProfitStore } from '../stores/profitStore.js'
+import { useAuthStore } from '../stores/authStore.js'
+import { login as apiLogin, register as apiRegister, phoneLogin as apiPhoneLogin, sendCode as apiSendCode, sendLoginCode as apiSendLoginCode, sendRegisterCode as apiSendRegisterCode, sendResetCode as apiSendResetCode, resetPassword as apiResetPassword } from '../api/auth.js'
 
 const router = useRouter()
-const store = useProfitStore()
+const store = useAuthStore()
 
 // 三种模式：'login' | 'register' | 'reset'
 // login 子模式：'password'（用户名密码）| 'code'（手机号验证码）
@@ -15,7 +16,7 @@ function switchLoginType(type) {
   errorMsg.value = ''
 }
 
-const loginType = ref('password') // 'password' 或 'code'
+const loginType = ref('code') // 'code' 或 'password'，默认手机号登录优先
 const username = ref('')
 const password = ref('')
 const nickname = ref('')
@@ -52,7 +53,7 @@ function resetForm() {
   confirmPassword.value = ''
   phone.value = ''
   verificationCode.value = ''
-  loginType.value = 'password'
+  loginType.value = 'code'
   loading.value = false
   sendingCode.value = false
   countdown.value = 0
@@ -83,11 +84,11 @@ async function handleSendCode() {
   sendingCode.value = true
   errorMsg.value = ''
   try {
-    await store.sendResetCode(phone.value)
+    await apiSendRegisterCode({ phone: phone.value })
     startCountdown()
     errorMsg.value = '验证码已发送至控制台，请查看'
   } catch (err) {
-    errorMsg.value = err.message || '发送验证码失败'
+    errorMsg.value = err.response?.data?.msg || err.message || '发送验证码失败'
   } finally {
     sendingCode.value = false
   }
@@ -101,11 +102,29 @@ async function handleLoginSendCode() {
   sendingCode.value = true
   errorMsg.value = ''
   try {
-    await store.sendLoginCode(phone.value)
+    await apiSendLoginCode({ phone: phone.value })
     startCountdown()
     errorMsg.value = '验证码已发送至控制台，请查看'
   } catch (err) {
-    errorMsg.value = err.message || '发送验证码失败'
+    errorMsg.value = err.response?.data?.msg || err.message || '发送验证码失败'
+  } finally {
+    sendingCode.value = false
+  }
+}
+
+async function handleResetSendCode() {
+  if (!phone.value.trim()) {
+    errorMsg.value = '请输入手机号'
+    return
+  }
+  sendingCode.value = true
+  errorMsg.value = ''
+  try {
+    await apiSendResetCode({ phone: phone.value })
+    startCountdown()
+    errorMsg.value = '验证码已发送至控制台，请查看'
+  } catch (err) {
+    errorMsg.value = err.response?.data?.msg || err.message || '发送验证码失败'
   } finally {
     sendingCode.value = false
   }
@@ -119,11 +138,11 @@ async function handleRegisterSendCode() {
   sendingCode.value = true
   errorMsg.value = ''
   try {
-    await store.sendRegisterCode(phone.value)
+    await apiSendRegisterCode({ phone: phone.value })
     startCountdown()
     errorMsg.value = '验证码已发送至控制台，请查看'
   } catch (err) {
-    errorMsg.value = err.message || '发送验证码失败'
+    errorMsg.value = err.response?.data?.msg || err.message || '发送验证码失败'
   } finally {
     sendingCode.value = false
   }
@@ -174,7 +193,16 @@ async function handleSubmit() {
     if (mode.value === 'login') {
       if (loginType.value === 'password') {
         // 用户名密码登录
-        await store.login(username.value, password.value)
+        const loginRes = await apiLogin({ username: username.value, password: password.value })
+        if (loginRes.data.code === 200) {
+          const { token: t, username: u, userId: uid, permissions, roles } = loginRes.data.data
+          store.setToken(t)
+          store.setUsername(u)
+          store.setUserId(uid)
+          store.setAuthData(permissions || [], roles || [], [])
+        } else {
+          throw new Error(loginRes.data.msg || '登录失败')
+        }
       } else {
         // 手机号验证码登录
         if (!phone.value.trim() || !verificationCode.value.trim()) {
@@ -182,7 +210,16 @@ async function handleSubmit() {
           loading.value = false
           return
         }
-        await store.phoneLogin(phone.value, verificationCode.value)
+        const phoneLoginRes = await apiPhoneLogin({ phone: phone.value, code: verificationCode.value })
+        if (phoneLoginRes.data.code === 200) {
+          const { token: t, username: u, userId: uid, permissions, roles } = phoneLoginRes.data.data
+          store.setToken(t)
+          store.setUsername(u)
+          store.setUserId(uid)
+          store.setAuthData(permissions || [], roles || [], [])
+        } else {
+          throw new Error(phoneLoginRes.data.msg || '登录失败')
+        }
       }
     } else if (mode.value === 'register') {
       if (!nickname.value.trim()) {
@@ -195,7 +232,17 @@ async function handleSubmit() {
         loading.value = false
         return
       }
-      await store.register(username.value, password.value, nickname.value, phone.value, verificationCode.value)
+      await apiRegister({ username: username.value, password: password.value, nickname: nickname.value, phone: phone.value, code: verificationCode.value })
+      const loginRes = await apiLogin({ username: username.value, password: password.value })
+      if (loginRes.data.code === 200) {
+        const { token: t, username: u, userId: uid, permissions, roles } = loginRes.data.data
+        store.setToken(t)
+        store.setUsername(u)
+        store.setUserId(uid)
+        store.setAuthData(permissions || [], roles || [], [])
+      } else {
+        throw new Error(loginRes.data.msg || '注册后登录失败')
+      }
     } else {
       // reset 模式 - 第一步：发送验证码
       if (!phone.value.trim() || !verificationCode.value.trim()) {
@@ -213,7 +260,10 @@ async function handleSubmit() {
         loading.value = false
         return
       }
-      await store.resetPasswordWithCode(phone.value, verificationCode.value, password.value)
+      const resetRes = await apiResetPassword({ phone: phone.value, code: verificationCode.value, newPassword: password.value })
+      if (resetRes.data.code !== 200) {
+        throw new Error(resetRes.data.msg || '重置密码失败')
+      }
       errorMsg.value = '密码重置成功，即将跳转登录...'
       setTimeout(() => {
         mode.value = 'login'
@@ -253,32 +303,21 @@ async function handleSubmit() {
           <div class="login-tabs">
             <div
               class="login-tab"
-              :class="{ active: loginType === 'password' }"
-              @click="switchLoginType('password')"
-            >
-              账号密码登录
-            </div>
-            <div
-              class="login-tab"
               :class="{ active: loginType === 'code' }"
               @click="switchLoginType('code')"
             >
               手机号登录
             </div>
+            <div
+              class="login-tab"
+              :class="{ active: loginType === 'password' }"
+              @click="switchLoginType('password')"
+            >
+              账号密码登录
+            </div>
           </div>
 
-          <template v-if="loginType === 'password'">
-            <div class="form-item">
-              <label>用户名</label>
-              <input v-model="username" type="text" placeholder="请输入用户名" required />
-            </div>
-            <div class="form-item">
-              <label>密码</label>
-              <input v-model="password" type="password" placeholder="请输入密码" required />
-            </div>
-          </template>
-
-          <template v-else>
+          <template v-if="loginType === 'code'">
             <div class="form-item">
               <label>手机号</label>
               <input v-model="phone" type="text" placeholder="请输入手机号" required />
@@ -294,6 +333,17 @@ async function handleSubmit() {
                   {{ countdown > 0 ? countdown + 's' : (sendingCode ? '发送中...' : '获取验证码') }}
                 </button>
               </div>
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="form-item">
+              <label>用户名</label>
+              <input v-model="username" type="text" placeholder="请输入用户名" required />
+            </div>
+            <div class="form-item">
+              <label>密码</label>
+              <input v-model="password" type="password" placeholder="请输入密码" required />
             </div>
           </template>
         </template>
@@ -343,7 +393,7 @@ async function handleSubmit() {
             </div>
             <div class="form-item code-btn-wrap">
               <label>&nbsp;</label>
-              <button class="code-btn" :disabled="sendingCode || countdown > 0" @click.stop="handleSendCode">
+              <button class="code-btn" :disabled="sendingCode || countdown > 0" @click.stop="handleResetSendCode">
                 {{ countdown > 0 ? countdown + 's' : (sendingCode ? '发送中...' : '获取验证码') }}
               </button>
             </div>

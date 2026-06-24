@@ -1,11 +1,11 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getUsers, updateUserStatus, assignUserRole, resetUserPassword } from '../../api/admin.js'
+import { getUsers, updateUserStatus, assignUserRole, resetUserPassword, deleteUser } from '../../api/admin.js'
 import { getRoles } from '../../api/admin.js'
-import { useProfitStore } from '../../stores/profitStore.js'
+import { useAuthStore } from '../../stores/authStore.js'
 
-const store = useProfitStore()
+const store = useAuthStore()
 const loading = ref(false)
 const userList = ref([])
 const total = ref(0)
@@ -128,6 +128,22 @@ function handleResetPassword() {
   }).catch(() => ElMessage.error('重置密码失败'))
 }
 
+function handleDeleteUser(row) {
+  ElMessageBox.confirm(`确定要删除用户 "${row.username}" 吗？此操作不可恢复！`, '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'error'
+  }).then(async () => {
+    try {
+      await deleteUser(row.id)
+      ElMessage.success('删除成功')
+      loadData()
+    } catch (e) {
+      ElMessage.error(e.response?.data?.msg || '删除失败')
+    }
+  }).catch(() => {})
+}
+
 onMounted(() => {
   loadData()
   loadRoles()
@@ -173,7 +189,7 @@ onMounted(() => {
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="180" />
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="320" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" @click="openRoleDialog(row)">分配角色</el-button>
             <el-button size="small" type="warning" @click="openPasswordDialog(row)">重置密码</el-button>
@@ -183,6 +199,14 @@ onMounted(() => {
               @click="handleToggleStatus(row)"
             >
               {{ row.status === 1 ? '禁用' : '启用' }}
+            </el-button>
+            <el-button
+              v-if="row.roleCode !== 'ADMIN'"
+              size="small"
+              type="danger"
+              @click="handleDeleteUser(row)"
+            >
+              删除
             </el-button>
           </template>
         </el-table-column>

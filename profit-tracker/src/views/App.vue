@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from 'vue'
-import { useProfitStore } from '../stores/profitStore.js'
+import { useAuthStore } from '../stores/authStore.js'
 
-const store = useProfitStore()
+const store = useAuthStore()
 
 const isLoggedIn = computed(() => store.token !== null)
 </script>

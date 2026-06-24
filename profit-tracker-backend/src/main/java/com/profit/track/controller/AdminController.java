@@ -103,6 +103,14 @@ public class AdminController {
         return Result.ok();
     }
 
+    /** 删除用户 */
+    @DeleteMapping("/users/{userId}")
+    @Operation(summary = "删除用户")
+    public Result<Void> deleteUser(@PathVariable Long userId) {
+        sysUserService.deleteUser(userId);
+        return Result.ok();
+    }
+
     // ==================== 角色管理 ====================
 
     /** 获取所有角色 */
@@ -206,6 +214,7 @@ public class AdminController {
             if (primaryRole != null) {
                 response.setRoleId(primaryRole.getId());
                 response.setRoleName(primaryRole.getRoleName());
+                response.setRoleCode(primaryRole.getRoleCode());
                 response.setRoleLevel(primaryRole.getRoleLevel());
             }
         }

@@ -279,6 +279,26 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         sysUserRoleService.assignRoleToUser(userId, roleId);
     }
 
+    @Override
+    public void deleteUser(Long userId) {
+        SysUser user = getById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+
+        // 检查用户是否拥有 ADMIN 角色
+        List<Long> roleIds = sysUserRoleService.getUserRoleIds(userId);
+        for (Long roleId : roleIds) {
+            SysRole role = sysRoleMapper.selectById(roleId);
+            if (role != null && "ADMIN".equals(role.getRoleCode())) {
+                throw new RuntimeException("不允许删除超级管理员用户");
+            }
+        }
+
+        // 删除用户
+        removeById(userId);
+    }
+
     private UserInfoResponse toUserInfoResponse(SysUser user) {
         UserInfoResponse response = new UserInfoResponse();
         response.setId(user.getId());

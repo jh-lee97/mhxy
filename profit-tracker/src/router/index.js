@@ -1,4 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { getUserPermissions } from '../api/auth.js'
 
 const routes = [
   {
@@ -15,17 +16,9 @@ const routes = [
   {
     path: '/admin',
     redirect: '/admin/users',
-    meta: { requiresAdmin: true }
-  },
-  {
-    path: '/admin/users',
-    name: 'AdminUsers',
     component: () => import('../views/admin/AdminLayout.vue'),
+    meta: { requiresAdmin: true, title: '管理后台' },
     children: [
-      {
-        path: '',
-        redirect: '/admin/users'
-      },
       {
         path: 'users',
         name: 'UserManage',
@@ -43,8 +36,20 @@ const routes = [
         name: 'PermissionManage',
         component: () => import('../views/admin/PermissionManage.vue'),
         meta: { title: '权限管理' }
+      },
+      {
+        path: 'guides',
+        name: 'GuideManage',
+        component: () => import('../views/admin/GuideManage.vue'),
+        meta: { title: '攻略管理' }
       }
     ]
+  },
+  {
+    path: '/guide/:id',
+    name: 'GuideDetail',
+    component: () => import('../views/GuideDetailView.vue'),
+    meta: { title: '攻略详情' }
   }
 ]
 
@@ -54,7 +59,7 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const token = localStorage.getItem('token')
   
   // 未登录
@@ -70,24 +75,31 @@ router.beforeEach((to, from, next) => {
   }
 
   // 需要管理员权限
-  if (to.meta.requiresAdmin && token) {
+  if (to.matched.some(record => record.meta.requiresAdmin) && token) {
     const roles = JSON.parse(localStorage.getItem('roles') || '[]')
     if (!roles.includes('ADMIN')) {
       next('/')
       return
     }
-    // 加载权限
+    // 加载权限（如果还没有缓存）
     if (!localStorage.getItem('permissions')) {
-      fetch('http://localhost:8080/api/auth/permissions')
-        .then(res => res.json())
-        .then(data => {
-          if (data.code === 200 && data.data) {
-            localStorage.setItem('permissions', JSON.stringify(data.data.permissions || []))
-            localStorage.setItem('roles', JSON.stringify(data.data.roles || []))
-            localStorage.setItem('menus', JSON.stringify(data.data.menus || []))
-          }
-        })
-        .catch(() => {})
+      try {
+        const res = await getUserPermissions()
+        if (res.data.code === 200 && res.data.data) {
+          localStorage.setItem('permissions', JSON.stringify(res.data.data.permissions || []))
+          localStorage.setItem('roles', JSON.stringify(res.data.data.roles || []))
+          localStorage.setItem('menus', JSON.stringify(res.data.data.menus || []))
+        }
+      } catch (err) {
+        console.error('[路由守卫] 权限加载失败:', err)
+        // 权限加载失败，清除 token 并跳转登录
+        localStorage.removeItem('token')
+        localStorage.removeItem('roles')
+        localStorage.removeItem('permissions')
+        localStorage.removeItem('menus')
+        next('/login')
+        return
+      }
     }
   }
 

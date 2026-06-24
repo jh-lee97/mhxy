@@ -68,6 +68,26 @@ CREATE TABLE profit_record (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='收益记录表';
 
 -- ========================================
+-- 游戏攻略表
+-- ========================================
+DROP TABLE IF EXISTS game_guide;
+
+CREATE TABLE game_guide (
+    id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    category        VARCHAR(50)     NOT NULL COMMENT '分类（如：日常任务、副本、活动）',
+    title           VARCHAR(200)    NOT NULL COMMENT '攻略标题',
+    summary         VARCHAR(500)    DEFAULT NULL COMMENT '摘要',
+    content         TEXT            DEFAULT NULL COMMENT '正文内容',
+    sort_order      INT             DEFAULT 0 COMMENT '排序权重：数字越小越靠前',
+    status          TINYINT         DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
+    created_at      DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at      DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    INDEX idx_category (category),
+    INDEX idx_sort_order (sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='游戏攻略表';
+
+-- ========================================
 -- 初始化数据
 -- ========================================
 
@@ -94,3 +114,14 @@ VALUES
     (1, '2025-06-04', '日常任务', '师门', 150000, 0, 5000, 50000, '', NOW(), NOW()),
     (1, '2025-06-03', '活动', '周末活动', 600000, 10000, 20000, 300000, '周末高收益', NOW(), NOW()),
     (1, '2025-06-02', '跑商', '跑商', 400000, 0, 0, 150000, '', NOW(), NOW());
+
+-- ========================================
+-- 游戏攻略初始化数据
+-- ========================================
+INSERT INTO game_guide (category, title, summary, content, sort_order, status) VALUES
+('日常任务', '师门任务高效攻略', '每天20次师门，稳定收益', '1. 准备足够的药品和暗器\n2. NPC位置：长安城（212,12）\n3. 战斗技巧：优先击杀小怪，最后打BOSS\n4. 预计收益：约15万梦幻币/次', 1, 1),
+('日常任务', '捉鬼任务全解析', '每日必做，高额经验奖励', '1. 找阴间判官（建邺城）领鬼符\n2. 进入鬼王洞府\n3. 队伍配置：至少2法系+1物理+1辅助\n4. 速杀技巧：封印系优先出手\n5. 预计收益：约30万梦幻币/轮', 2, 1),
+('副本', '秘境寻宝入门指南', '每日3次秘境，丰厚奖励', '1. 找长安城杂货商（200,150）进入\n2. 每关选择正确路线获得额外奖励\n3. 推荐路线：先左后右再上\n4. 通关奖励：经验、金钱、道具', 3, 1),
+('副本', '英雄冢副本打法', '高难度副本，高回报', '1. 需要5人组队\n2. 第一层：清理小怪\n3. 第二层：注意躲避陷阱\n4. BOSS战：坦克顶住，治疗加血\n5. 推荐装备：防御>=5000', 4, 1),
+('活动', '周末活动合集', '周六周日限定活动', '1. 华山论剑：PVP竞技\n2. 群雄逐鹿：帮派大战\n3. 科举大赛：知识问答\n4. 建议提前组队，准备药品', 5, 1),
+('装备打造', '装备打造与修炼', '提升战力的关键途径', '1. 找铁匠铺打造装备\n2. 使用百炼精铁提高品质\n3. 装备附魔：找魔法学徒\n4. 宝石镶嵌：提升属性\n5. 推荐优先强化武器和衣服', 6, 1);

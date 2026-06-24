@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { getRecords, deleteRecord as apiDeleteRecord } from '../api/record.js'
 import { formatMoney } from '../utils/format.js'
 
@@ -7,6 +7,11 @@ const loading = ref(false)
 const records = ref([])
 const dialogVisible = ref(false)
 const _targetId = ref(null)
+
+// 控制 body 滚动锁定
+watch(dialogVisible, (val) => {
+  document.body.style.overflow = val ? 'hidden' : ''
+})
 
 async function loadRecords() {
   loading.value = true

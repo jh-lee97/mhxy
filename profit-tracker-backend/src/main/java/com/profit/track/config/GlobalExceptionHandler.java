@@ -31,7 +31,7 @@ public class GlobalExceptionHandler {
      * 这是 Service 层抛出异常的主要入口，如 "记录不存在"、"用户名已存在" 等
      */
     @ExceptionHandler(RuntimeException.class)
-    @ResponseStatus(HttpStatus.OK)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleRuntimeException(RuntimeException e) {
         log.error("业务异常: {}", e.getMessage(), e);
         return Result.fail(400, e.getMessage());

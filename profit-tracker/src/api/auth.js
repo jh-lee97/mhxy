@@ -20,6 +20,11 @@ export function sendCode(data) {
   return api.post('/auth/send-code', data)
 }
 
+/** 发送登录验证码（仅需手机号） */
+export function sendLoginCode(data) {
+  return api.post('/auth/send-login-code', data)
+}
+
 /** 发送注册验证码 */
 export function sendRegisterCode(data) {
   return api.post('/auth/send-register-code', data)

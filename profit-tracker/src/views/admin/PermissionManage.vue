@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getPermissions, createPermission, updatePermission, deletePermission } from '../../api/admin.js'
+import { useAuthStore } from '../../stores/authStore.js'
 
 const loading = ref(false)
 const permissionList = ref([])

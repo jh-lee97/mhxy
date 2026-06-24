@@ -1,9 +1,14 @@
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 
 const emit = defineEmits(['add'])
 
 const showDialog = ref(false)
+
+// 控制 body 滚动锁定
+watch(showDialog, (val) => {
+  document.body.style.overflow = val ? 'hidden' : ''
+})
 
 const POINT_CARD_PRICE = 1.3
 

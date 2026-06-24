@@ -33,7 +33,7 @@ public class ProfitRecord implements Serializable {
     private BigDecimal cbgIncome;
 
     /** 道具/装备价值 */
-    @TableField("道具Income")
+    @TableField("prop_income")
     private BigDecimal propIncome;
 
     /** 总成本 */

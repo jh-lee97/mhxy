@@ -30,3 +30,12 @@ body {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* 表格表头和内容居中 */
+.el-table th.el-table__cell {
+  text-align: center !important;
+}
+
+.el-table td.el-table__cell {
+  text-align: center !important;
+}

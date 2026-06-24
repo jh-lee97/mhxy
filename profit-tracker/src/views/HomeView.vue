@@ -6,11 +6,12 @@ import Dashboard from '../components/Dashboard.vue'
 import AddRecordForm from '../components/AddRecordForm.vue'
 import RecordList from '../components/RecordList.vue'
 import ProfitChart from '../components/ProfitChart.vue'
+import GameGuideSection from '../components/GameGuideSection.vue'
 import { useAuthStore } from '../stores/authStore.js'
 import { addRecord as apiAddRecord } from '../api/record.js'
 
 const router = useRouter()
-const store = useProfitStore()
+const store = useAuthStore()
 const formRef = ref(null)
 
 const isLoggedIn = computed(() => store.token !== null)
@@ -21,7 +22,7 @@ function goToAdmin() {
 }
 
 async function handleAdd(record) {
-  await store.addRecord(record)
+  await apiAddRecord(record)
   if (formRef.value && formRef.value.closeDialog) {
     formRef.value.closeDialog()
   }
@@ -34,7 +35,7 @@ async function handleLogout() {
       cancelButtonText: '取消',
       type: 'warning',
     })
-    store.logout()
+    store.clearAuth()
     ElMessage.success('已退出登录')
     router.push('/login')
   } catch {
@@ -43,11 +44,7 @@ async function handleLogout() {
 }
 
 onMounted(() => {
-  if (isLoggedIn.value) {
-    store.getRecords()
-    store.getStats()
-    store.getChartRecords()
-  }
+  // 数据加载由各子组件自行处理
 })
 </script>
 
@@ -75,6 +72,10 @@ onMounted(() => {
 
       <section class="section">
         <ProfitChart />
+      </section>
+
+      <section class="section">
+        <GameGuideSection />
       </section>
 
       <section class="section">
