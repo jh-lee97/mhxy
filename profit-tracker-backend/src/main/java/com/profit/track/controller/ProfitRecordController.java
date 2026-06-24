@@ -22,7 +22,7 @@ public class ProfitRecordController {
 
     /** 查询记录列表 */
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_USER')")
     @Operation(summary = "查询记录列表", description = "根据当前登录用户查询所有收益记录，按日期降序")
     public Result<List<ProfitRecordResponse>> list(HttpServletRequest request) {
         Long userId = getUserIdFromRequest(request);
@@ -32,7 +32,7 @@ public class ProfitRecordController {
 
     /** 新增记录 */
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_USER')")
     @Operation(summary = "新增记录", description = "新增一条收益记录")
     public Result<ProfitRecordResponse> add(@RequestBody ProfitRecordRequest request, HttpServletRequest httpRequest) {
         Long userId = getUserIdFromRequest(httpRequest);
@@ -43,7 +43,7 @@ public class ProfitRecordController {
 
     /** 更新记录 */
     @PutMapping
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_USER')")
     @Operation(summary = "更新记录", description = "更新一条收益记录")
     public Result<ProfitRecordResponse> update(@RequestBody ProfitRecordRequest request, HttpServletRequest httpRequest) {
         Long userId = getUserIdFromRequest(httpRequest);
@@ -53,7 +53,7 @@ public class ProfitRecordController {
 
     /** 删除记录 */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_USER')")
     @Operation(summary = "删除记录", description = "根据 ID 删除一条收益记录")
     public Result<Void> delete(
             @Parameter(description = "记录ID", required = true) @PathVariable Long id,
@@ -65,7 +65,7 @@ public class ProfitRecordController {
 
     /** 统计信息 */
     @GetMapping("/stats")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_USER')")
     @Operation(summary = "统计信息", description = "获取今日/本周/累计的收入、成本、利润统计")
     public Result<StatResponse> stats(HttpServletRequest request) {
         Long userId = getUserIdFromRequest(request);
@@ -75,7 +75,7 @@ public class ProfitRecordController {
 
     /** 图表数据（近7日） */
     @GetMapping("/chart")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_USER')")
     @Operation(summary = "图表数据", description = "获取近7日的收入、成本、净利润趋势数据")
     public Result<List<ChartResponse>> chart(HttpServletRequest request) {
         Long userId = getUserIdFromRequest(request);
