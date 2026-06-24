@@ -21,7 +21,7 @@ public class TaskController {
 
     /** 获取活跃计划（今日任务） */
     @GetMapping("/active")
-    @PreAuthorize("hasAuthority('task:view')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "获取活跃计划", description = "获取当前用户的活跃任务计划（含每日任务）")
     public Result<TaskPlanResponse> getActivePlan(HttpServletRequest request) {
         Long userId = getUserIdFromRequest(request);
@@ -34,7 +34,7 @@ public class TaskController {
 
     /** 获取指定计划详情 */
     @GetMapping("/detail/{planId}")
-    @PreAuthorize("hasAuthority('task:view')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "获取计划详情", description = "获取指定计划详情（含每日任务和统计）")
     public Result<TaskPlanResponse> getPlanDetail(
             @PathVariable Long planId, HttpServletRequest request) {
@@ -45,7 +45,7 @@ public class TaskController {
 
     /** 获取本周所有计划 */
     @GetMapping("/weekly")
-    @PreAuthorize("hasAuthority('task:view')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "获取所有计划", description = "获取用户的所有周任务计划")
     public Result<List<TaskPlanResponse>> getWeeklyPlans(HttpServletRequest request) {
         Long userId = getUserIdFromRequest(request);
@@ -55,7 +55,7 @@ public class TaskController {
 
     /** 创建新计划 */
     @PostMapping("/plan")
-    @PreAuthorize("hasAuthority('task:add')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "创建任务计划", description = "创建一个新的周任务计划，包含每日任务")
     public Result<TaskPlanResponse> createPlan(@RequestBody TaskPlanRequest request, HttpServletRequest httpRequest) {
         Long userId = getUserIdFromRequest(httpRequest);
@@ -65,7 +65,7 @@ public class TaskController {
 
     /** 更新计划 */
     @PutMapping("/plan")
-    @PreAuthorize("hasAuthority('task:edit')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "更新任务计划", description = "更新计划信息和每日任务")
     public Result<TaskPlanResponse> updatePlan(@RequestBody TaskPlanRequest request, HttpServletRequest httpRequest) {
         Long userId = getUserIdFromRequest(httpRequest);
@@ -75,7 +75,7 @@ public class TaskController {
 
     /** 删除计划 */
     @DeleteMapping("/plan/{planId}")
-    @PreAuthorize("hasAuthority('task:delete')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "删除任务计划", description = "删除一个周任务计划及其所有任务")
     public Result<Void> deletePlan(@PathVariable Long planId, HttpServletRequest request) {
         Long userId = getUserIdFromRequest(request);
@@ -85,7 +85,7 @@ public class TaskController {
 
     /** 切换计划状态（激活/停用） */
     @PatchMapping("/plan/{planId}/toggle")
-    @PreAuthorize("hasAuthority('task:edit')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "切换计划状态", description = "激活或停用某个计划")
     public Result<Void> togglePlanStatus(@PathVariable Long planId, HttpServletRequest request) {
         Long userId = getUserIdFromRequest(request);
@@ -95,7 +95,7 @@ public class TaskController {
 
     /** 完成单个任务 */
     @PostMapping("/completion")
-    @PreAuthorize("hasAuthority('task:edit')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "完成任务", description = "标记某个任务为完成/跳过")
     public Result<TaskCompletionResponse> completeTask(@RequestBody TaskCompletionRequest request, HttpServletRequest httpRequest) {
         Long userId = getUserIdFromRequest(httpRequest);
@@ -105,7 +105,7 @@ public class TaskController {
 
     /** 批量完成某天所有任务 */
     @PostMapping("/batch-complete")
-    @PreAuthorize("hasAuthority('task:edit')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "批量完成任务", description = "批量标记某天所有任务为完成/跳过")
     public Result<List<TaskCompletionResponse>> batchComplete(
             @RequestParam Long planId,
@@ -120,7 +120,7 @@ public class TaskController {
 
     /** 获取某天任务完成情况 */
     @GetMapping("/day/{date}")
-    @PreAuthorize("hasAuthority('task:view')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "获取某天任务", description = "获取指定计划某天的任务完成情况")
     public Result<List<TaskCompletionResponse>> getDayCompletions(
             @RequestParam Long planId,
@@ -133,7 +133,7 @@ public class TaskController {
 
     /** 获取每日统计 */
     @GetMapping("/stats/{planId}")
-    @PreAuthorize("hasAuthority('task:stats')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "获取每日统计", description = "获取计划内每天的统计信息")
     public Result<List<DailyTaskStats>> getDailyStats(
             @PathVariable Long planId, HttpServletRequest request) {
@@ -144,7 +144,7 @@ public class TaskController {
 
     /** 获取今日统计 */
     @GetMapping("/stats/today")
-    @PreAuthorize("hasAuthority('task:stats')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "获取今日统计", description = "获取活跃计划今日的任务统计")
     public Result<DailyTaskStats> getTodayStats(HttpServletRequest request) {
         Long userId = getUserIdFromRequest(request);
